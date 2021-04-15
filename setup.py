@@ -8,7 +8,7 @@ setup(
     url='https://github.com/SalvoCalcagno/eremus',
     author='Salvatore Calcagno',
     author_email='salvo.calcagno@hotmail.it',
-    packages=['eremus'],
+    packages=['eremus, eremus.hello'],
     install_requires=['numpy'],
     version='0.1',
     license='MIT',
