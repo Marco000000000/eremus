@@ -3,9 +3,16 @@
 
 from setuptools import setup
 
-setup(name='eremus',
-      version='0.0.1',
-      description='utilities for EREMUS dataset',
-      license='GPLv3',
-      packages=['eremus'],
-      zip_safe=False)
+setup(
+    name='eremus',
+    url='https://github.com/SalvoCalcagno/eremus',
+    author='Salvatore Calcagno',
+    author_email='salvo.calcagno@hotmail.it',
+    packages=['eremus'],
+    install_requires=['numpy'],
+    version='0.1',
+    license='MIT',
+    description='Utilities for EREMUS dataset',
+    # We will also need a readme eventually (there will be a warning)
+    # long_description=open('README.txt').read(),
+)
