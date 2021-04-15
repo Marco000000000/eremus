@@ -2,7 +2,7 @@ from .gew import gew_to_hldv4
 import pandas as pd
 import random
 import math
-import .gew
+from . import gew
 import re
 import os
 
