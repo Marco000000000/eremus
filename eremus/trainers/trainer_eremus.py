@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, WeightedRandomSampler
-import models
+import .models
 import pandas as pd
 from utils.models import add_net_to_params
 from utils.saver import Saver
