@@ -1,2 +1,6 @@
-
 eremus/__pycache__/splitter.cpython-38.pyc
+build/
+dist/
+*__pycache__/
+*.egg/
+*.egg-info/
