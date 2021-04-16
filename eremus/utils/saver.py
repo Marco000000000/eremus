@@ -10,7 +10,7 @@ try:
     has_cml = True
 except:
     has_cml = False
-from utils.misc import image_tensor_to_grid
+from eremus.utils.misc import image_tensor_to_grid
 from matplotlib import pyplot as plt
 import sys
 import ast

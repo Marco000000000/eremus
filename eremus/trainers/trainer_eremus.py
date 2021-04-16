@@ -5,8 +5,8 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader, WeightedRandomSampler
 import eremus.models as models
 import pandas as pd
-from ..utils.models import add_net_to_params
-from ..utils.saver import Saver
+from eremus.utils.models import add_net_to_params
+from eremus.utils.saver import Saver
 
 # Histogram logging utilities
 hooks = None # initialized each time
