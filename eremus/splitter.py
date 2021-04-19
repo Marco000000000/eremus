@@ -617,6 +617,187 @@ def de_ws_rnd_temporal_split(xls_file, w_dir, train_frac=0.7, validation_frac=0.
                
     return tuple([len(df) for _, df in datasets.items()])
 
+def get_kfold_temporal_split_boundaries(a, b, test_frac, fold=0, verbose=False):
+    # we assume validation_frac = test_frac
+    # compute segment lenght
+    real_l = b-a
+    # compute sub-lenght
+    l_test = int(real_l*test_frac)
+    l_validation = l_test
+    # compute number of folds with the given fractions
+    folds = int(1//test_frac)
+    assert fold<folds and fold>=0, "Please insert a valid value for fold. 0-"+folds-1+" values are accepted."
+    # compute used length
+    l = l_test*folds
+    l_train = l - l_test - l_validation
+    # compute pivot for validation set
+    pivot = a + fold*l_test
+    # compute validation boundaries
+    validation_start, validation_stop = pivot, pivot + l_validation
+    # compute pivot for test set
+    pivot = a + (fold+1)%folds*l_test
+    # compute test boundaries
+    test_start, test_stop = pivot, pivot + l_test    
+    # print check
+    if verbose:
+        print('Test: ', test_start, test_stop)
+        print('Validation: ', validation_start, validation_stop)
+    
+    # create dictionary
+    boundaries = {
+        'validation': (validation_start, validation_stop),
+        'test': (test_start, test_stop),
+    }
+    return boundaries
+
+def de_ws_sample_kfold_temporal_split(sample, test_frac=0.15, fold=0, window_size=5.0, step_size=1.0, s_freq=128, verbose=False):
+    """
+    Get train, test and validation array indices for a single sample: 
+    chosen arrays for each split are granted to come from not inter-split overlapped windows.
+    
+    Parameters
+    ----------
+    sample: pandas.core.series.Series
+        a dataset row
+    test_frac : float
+        test_fraction
+    fold : int
+        the fold to use in current split
+    window_size : float
+        window size used in dataset augmentation (window sliding) in s
+    step_size : float
+        window size used in dataset augmentation (window sliding) in s
+    s_freq : int
+        sampling frequency
+
+    Returns
+    -------
+    dict {split: list (int)}
+        a dict with lists of array indices, to use for train, validation, test sets.
+    """
+    
+    # get sample lenght
+    sample_len = sample.end_index - sample.start_index
+    # compute number of frames for the sample
+    n_frames = math.floor((sample_len-window_size)/step_size) + 1
+    # compute boundaries beetween splits
+    boundaries = get_kfold_temporal_split_boundaries(sample.start_index, sample.end_index, test_frac, fold=fold, verbose=verbose)
+    test_start, test_stop = boundaries['test']
+    validation_start, validation_stop = boundaries['validation']
+    # compute max start index for a window
+    max_window_start = sample.start_index + int(sample_len-(window_size*s_freq))
+    # compute real step size
+    sliding_step = int(step_size*s_freq) 
+    # init empty lists
+    train_idx = []
+    val_idx = []
+    test_idx = []
+    # window sliding
+    for window_id, window_start in enumerate(range(sample.start_index, max_window_start, sliding_step)):
+        #print(window_id, window_start)
+        # compute window_end
+        window_end = window_start + int(window_size*s_freq)
+        # check and assign to split
+        if window_start>= test_start and window_end < test_stop:
+            test_idx = test_idx + [window_id]
+        elif window_start >= validation_start and window_end < validation_stop:
+            val_idx = val_idx + [window_id]
+        elif (window_start >= test_stop and window_end >= validation_start and window_end < validation_stop) or (window_start < test_stop and window_start >= test_start and window_end < validation_start):
+            if verbose:
+                print('window id %d is in overlap: excluded' % window_id)
+        elif window_end < validation_start or window_start >= test_stop:
+            train_idx = train_idx + [window_id]
+        elif verbose:
+            print('window id %d is in overlap: excluded' % window_id)
+    # create dictionary
+    array_indices = {
+        'train': train_idx,
+        'validation': val_idx,
+        'test': test_idx,
+    }
+    return array_indices
+
+def de_ws_kfold_temporal_split(xls_file, w_dir, test_frac=0.15, fold=0, window_size=10, step_size=3, s_freq=128, verbose=False):
+
+    """
+    Given the dataset, the split fractions and the sliding window parameters,
+    compute train, test and validation splits, thus producing three xls files.
+
+        Parameters
+        ----------
+        xls_file : str
+        w_dir : str
+        test_frac : float
+        fold : int
+        window_size : int
+        step_size : int
+        s_freq : int
+
+        Returns
+        -------
+        output : tuple, (n_train, n_val, n_test)
+    """
+    # read original dataset
+    samples = pd.read_excel(xls_file)
+    # delete additional columns
+    del samples['Unnamed: 0']
+
+    # get a sample
+    sample = samples.iloc[0]
+
+    # create empty dataframes
+    datasets = {
+        'train': pd.DataFrame(),
+        'validation': pd.DataFrame(),
+        'test': pd.DataFrame(),
+    }
+    
+    # initialize dataframes to fit samples dtypes
+    for _, df in datasets.items():
+        df['original_index'] = pd.Series([], dtype=int)
+        df['array_index'] = pd.Series([], dtype=int)
+        for k, v in sample.items():
+            if k == 'subject_id':
+                df[k] = pd.Series([], dtype=int)
+            else:
+                df[k] = pd.Series([], dtype=str)
+            
+    # iterate samples
+    num_samples = len(samples)
+    for i, sample in samples.iterrows():
+        print("{0:.0%}".format(i/num_samples), end='\r')
+        if(eval(sample.gew_1)[0]==20 or eval(sample.gew_1)[0]==21):
+            continue
+        # split sample into train, validation and test
+        array_indices = de_ws_sample_kfold_temporal_split(sample,
+                                                    test_frac=test_frac, 
+                                                    fold=fold,
+                                                    window_size=window_size, 
+                                                    step_size=step_size, 
+                                                    s_freq=s_freq,
+                                                    verbose = verbose)
+        for split in datasets:
+            split_indices = array_indices[split]
+            # iterate indices
+            for array_index in split_indices:
+                # add array_index
+                sample.loc['array_index'] = array_index
+                # add original index
+                #sample.loc['original_index'] = sample.original_index
+                # add sample to dataframe
+                datasets[split] = datasets[split].append(sample)
+    
+    os.makedirs(w_dir, exist_ok=True)
+    # reset indices and write into files
+    for split, df in datasets.items():
+        del df['start_index']
+        del df['end_index']
+        df.reset_index(drop=True, inplace=True)
+        df.to_excel(w_dir + split + '.xlsx')
+        
+               
+    return tuple([len(df) for _, df in datasets.items()])
+
 def de_ws_simple_split(xls_file, w_dir, window_size=10, step_size=3, s_freq=128):
 
     """
