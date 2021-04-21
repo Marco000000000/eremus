@@ -7,18 +7,21 @@
 
 
 import mne
+import json
 import numpy as np
 import pandas as pd
+from pathlib import Path
 from torchvision import transforms, utils
-
-# In[2]:
-
 
 # we need montage for calculating distances beetween sensors
 
 # get a sample from dataset
-samples = pd.read_excel('eremus_test.xlsx')
-pruned_eeg_root_dir = 'eeglab_raws\\'
+configuration_path = Path(__file__).parent.parent
+with open(configuration_path / 'configuration.txt') as json_file:
+    configuration = json.load(json_file)
+    path_to_eremus_data = configuration['path_to_eremus_data']
+samples = pd.read_excel(path_to_eremus_data + 'eremus_test.xlsx')
+pruned_eeg_root_dir = path_to_eremus_data + 'recordings_pruned_with_ICA\\'
 eeg_file = samples.iloc[0]['filename_pruned']
 sample = mne.io.read_raw_eeglab(pruned_eeg_root_dir + eeg_file, verbose = False)
 
@@ -27,10 +30,6 @@ ten_twenty_montage = mne.channels.make_standard_montage('standard_1020')
 sample.set_montage(ten_twenty_montage)
 montage = sample.get_montage()
 #fig = montage.plot()
-
-
-# In[3]:
-
 
 # channel names for EREMUS dataset
 ch_names = sample.ch_names

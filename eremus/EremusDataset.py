@@ -15,7 +15,7 @@ import pandas as pd
 import numpy as np
 from math import isnan
 import matplotlib.pyplot as plt
-from spatial_filter import spatial_filter
+from eremus.preprocessing.spatial_filter import spatial_filter
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms, utils
 
@@ -80,10 +80,6 @@ class EremusDataset(Dataset):
         elif isinstance(gew_emotion2, float):
             if isnan(gew_emotion2):
                 gew_emotion2 = None
-
-        #HERE PREPROCESSING
-        #landmarks = np.array([landmarks])
-        #landmarks = landmarks.astype('float').reshape(-1, 2)
         
         sample = {'subject_id': subject_id, 'eeg': raw_eeg, 'emotion1': gew_emotion1, 'emotion2': gew_emotion2, 'song': song, 'use_other': use_other, 'use_eyes_closed': use_eyes_closed}
 
@@ -111,7 +107,7 @@ class EremusDataset_V2(Dataset):
             indices (list(int), optional): Indices of xls_file to use in the current dataset.
             transform (callable, optional): Optional transform to be applied
                 on a sample.
-            select_data (boolean, optional): If data_type != EremusDataset_V2.DATA_PREPROCESSED and select_data = True, only channel data are selected, without metadata od Raw objects. 
+            select_data (boolean, optional): If data_type != EremusDataset_V2.DATA_PREPROCESSED and select_data = True, only channel data are selected, without metadata of Raw objects. Note that sample is a tuple of array: also time array is extracted.
             label_transform (callable, optional): Conversion function to be applied on a label.
             **args (optional): args to be passed to label_transform
         """
@@ -177,10 +173,6 @@ class EremusDataset_V2(Dataset):
         #elif isinstance(gew_emotion2, float):
         #    if isnan(gew_emotion2):
         #        gew_emotion2 = None
-
-        #HERE PREPROCESSING
-        #landmarks = np.array([landmarks])
-        #landmarks = landmarks.astype('float').reshape(-1, 2)
         
         if(self.label_transform is not None):
             emotion = self.label_transform(gew_emotion1, **self.args)
