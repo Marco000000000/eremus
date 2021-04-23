@@ -14,15 +14,14 @@ if (sys.version_info.minor<8):
         return res
 else:
     from math import prod
-    
-#get_ipython().run_line_magic('matplotlib', '')
 
-"""
-PART 1: GEW definition and utils
-In this part we define the gew object and the main interface.
-Functions to load gew emotions from rating files are provided.
-The main interface of gew emotion is a tuple of type (EMOTION, INTENSITY)
-"""
+#***************
+#PART 1: GEW definition and utils
+#***************
+
+#In this part we define the gew object and the main interface.
+#Functions to load gew emotions from rating files are provided.
+#The main interface of gew emotion is a tuple of type *(EMOTION, INTENSITY)*
 
 # emotions' dictionaries
 emotions = {
@@ -79,6 +78,32 @@ vd_coordinates = {
 
 # convert a rating row in to a list of gew tuples
 def dumps(rating):
+    """
+    It converts a rating row into a list of tuples. Each tuple is in *(emotion_id, intensity)* format.
+    
+    Parameters
+    ------------
+    rating : Union(pandas.core.series.Series, dict)
+        a rating row or a dictionary. It must be contain emotion families *gew_fam1* and *gew_fam2* as strings and emotion intensities *gew_int1* and *gew_int2* as integers.
+       
+    Returns
+    -------------
+    list
+        A list of tuples. Each tuple has got *emotion identifier* and *emotion intensity*.
+    
+    Examples
+    ------------
+    
+    >>> rating = {
+    ...    'gew_fam1': 'Interesse',
+    ...    'gew_int1': 4,
+    ...    'gew_fam2': 'Tristezza',
+    ...    'gew_int2': 2
+    ... }
+    >>> dumps(rating)
+    [(0, 4), (10, 2)]
+    
+    """
     # access ratings once
     fam1 = rating['gew_fam1']
     int1 = rating['gew_int1']
@@ -113,6 +138,26 @@ def dumps(rating):
 
 # convert a list of gew tuples in a dataframe 
 def loads(rating):
+    """
+    It converts a a list of gew tuples into a pandas dataframe.
+    
+    Parameters
+    ------------
+    rating : list of tuple
+        A list of tuples. Each tuple myst be in *(emotion_id, intensity)* format.
+       
+    Returns
+    -------------
+    pandas.core.frame.DataFrame
+        A dataframe containing the rating. Dataframe contains emotion families *gew_fam1* and *gew_fam2* (strings) and emotion intensities *gew_int1* and *gew_int2* (integers) as columns.
+    
+    Examples
+    ------------
+    >>> rating = [(13, 2), (15, 4)]
+    >>> loads(rating)
+    	gew_fam1	gew_int1	gew_fam2	gew_int2
+    0	Vergogna	2		Paura		4
+    """
     gew1 = rating[0]
     gew2 = rating[1]
     result = {}
@@ -126,19 +171,47 @@ def loads(rating):
         result['gew_int2'] = 0
     return pd.DataFrame(result, index=[0])
 
-
-# access GEW by attributes by dotted notation
-# access GEW by indices by brackets notation
-# example: 
-## rating = GEW("Interesse", 4)
-## rating.emotion --> "Interesse"
-## rating[1] --> 4
 class GEW(NamedTuple):
+    """
+    A class representig the Geneva Emotion Wheel rating. 
+    It is a named tuple, thus you can access the rating by brackets or by dotted notation.
+    
+    Fields
+    --------------
+    emotion : str
+        a string representing the felt emotion in human readble format.
+    intensity : int
+        a value representing emotion intensity (or arousal). It could be in [0,5] range.
+        
+    Examples
+    ---------------
+    >>> rating = GEW("Interesse", 4)
+    >>> #access GEW by attributes by dotted notation
+    >>> rating.emotion
+    Interesse
+    >>> #access GEW by indices by brackets notation
+    >>> rating[1]
+    4
+       
+    """
     emotion: str
     intensity: int
 
 # convert a GEW object in a tuple
 def dump(gew):
+    """
+    It converts a GEW object in a *(emotion_id, intensity)* formatted tuple. 
+    
+    Parameters
+    ------------
+    gew : gew.GEW
+        The GEW object to be converted
+       
+    Returns
+    -------------
+    tuple
+        A *(emotion_id, intensity)* formatted tuple.
+    """
     if gew.emotion == 'e':
         return None
     if re.search(emotions[21], gew.emotion):
@@ -147,25 +220,47 @@ def dump(gew):
     
 # convert a tuple in a GEW object
 def load(t_gew):
+    """
+    It converts a *(emotion_id, intensity)* formatted tuple in GEW object. 
+    
+    Parameters
+    ------------
+    gew : tuple
+        A *(emotion_id, intensity)* formatted tuple.
+        
+       
+    Returns
+    -------------
+    gew.GEW
+        The converted GEW object
+    """
     return GEW(emotions[t_gew[0]], t_gew[1])
 
-"""
-PART 2: GEW conversions
-In this part we expose functions in order to:
-- transform gew objects into class ids
-- plot data distributions, given a transform function and a ds
-- get data distribution, given a transform function
-"""
+#*********************
+#PART 2: GEW conversions
+#*********************
+
+#In this part we expose functions in order to:
+#- transform gew objects into class ids
+#- plot data distributions, given a transform function and a ds
+#- get data distribution, given a transform function
 
 # CONVERSION OF GEW EMOTIONS INTO VALENCE-AROUSAL-DOMINANCE MODEL
 def vad_coordinates(gew_emotion):
     """
-    Convert a gew emotion of type (EMOTION, INTENSITY) to VAD model.
+    It Converts a gew emotion tuple *(EMOTION, INTENSITY)* to Valence-Arousal-Dominance coordinates.
     
-    Params:
-        - gew emotion, (int, int): gew emotion of type (EMOTION, INTENSITY)
-    Returns:
-        Valence-Arousal-Dominance model coordinates (V, A, D).
+    Parameters
+    ------------
+    gew_emotion : (int, int) 
+         gew emotion tuple *(EMOTION, INTENSITY)*. *EMOTION* is emotion identifier. 
+         You can use `gew.emotions` dictionary to extract the emotion associated with the given id. 
+         *INTENSITY* is the emotion intensity associated to *EMOTION*.
+         
+    Returns
+    ------------
+    (float, float, float)
+        Valence-Arousal-Dominance coordinates (V, A, D). All values are expressed in [-1, 1] range.
     """
     V, D = vd_coordinates[gew_emotion[0]]
     A = round(2*gew_emotion[1]/5 - 1, 2)
@@ -176,17 +271,36 @@ def vad_coordinates(gew_emotion):
 
 def gew_to_hldv4(gew_emotion, min_arousal=0):
     """
-    Convert a gew emotion of type (EMOTION, INTENSITY) to High/Low Dominance/Valence.
-    Neutral class (NO EMOTION FELT) is not considered as a class.
-    Other classes (DIFFERENT EMOTIONS) are not considered as a class.
+    It Converts a gew emotion tuple *(EMOTION, INTENSITY)* to High/Low Dominance/Valence.
+    Neutral class (*NO EMOTION FELT*) is not considered as a class.
+    Other classes (*DIFFERENT EMOTIONS*) are not considered as a class.
     
     Dominance is considered Low in range [5, 15[, High in range [15, 5[
     Valence is considered Low in range [10, 20[, High in range [0, 10[
-    Divide VD graph into 4 different areas:
-    - HDHV (High Dominance, High Valence)
-    - LDHV (Low Dominance, High Valence)
-    - LDLV (Low Dominance, Low Valence)
-    - HDLV (High Dominance, Low Valence)
+    VD graph is thus divided into 4 different areas:
+        - HDHV (High Dominance, High Valence)
+        - LDHV (Low Dominance, High Valence)
+        - LDLV (Low Dominance, Low Valence)
+        - HDLV (High Dominance, Low Valence)
+        
+    Parameters
+    ------------
+    gew_emotion : Union[int, (int, int)] 
+         gew emotion tuple *(EMOTION, INTENSITY)*. *EMOTION* is emotion identifier. 
+         You can use `gew.emotions` dictionary to extract the emotion associated with the given id. 
+         *INTENSITY* is the emotion intensity associated to *EMOTION*.
+         You can also pass only *EMOTION*, without specifying the respective intensity.
+    min_arousal : int
+        The minimal intensity level to consider emotion as non-neutral. Do not use it: always ignored, used only to standardize conversion interface.
+         
+    Returns
+    ------------
+    int
+        A class identifier:
+            0. HDHV
+            1. LDHV
+            2. LDLV
+            3. HDLV
     """
     if isinstance(gew_emotion, int):
         emotion = gew_emotion
@@ -214,20 +328,39 @@ def gew_to_hldv4(gew_emotion, min_arousal=0):
     
 def gew_to_hldv5(gew_emotion, min_arousal=3):
     """
-    Convert a gew emotion of type (EMOTION, INTENSITY) to High/Low Dominance/Valence.
-    Neutral class (NO EMOTION FELT) is considered as a separate class.
-    Emotions with low arousal are considered neutral emotions.
-    The minimal intensity level to consider emotion non-neutral is specified by min_arousal parameter.
-    Other classes (DIFFERENT EMOTIONS) are not considered as a class.
+    It Converts a gew emotion tuple *(EMOTION, INTENSITY)* to High/Low Dominance/Valence.
+    Neutral class (*NO EMOTION FELT*) is considered as a separate class.
+    Emotions with low *INTENSITY* (arousal) are considered neutral emotions.
+    The minimal intensity level to consider emotion as non-neutral is specified by `min_arousal` parameter.
+    Other classes (*DIFFERENT EMOTIONS*) are not considered as a class.
     
     Dominance is considered Low in range [5, 15[, High in range [15, 5[
     Valence is considered Low in range [10, 20[, High in range [0, 10[
-    Divide VD graph into 5 different areas:
-    - NEUTRAL (Low Emotion Intensity)
-    - HDHV (High Dominance, High Valence)
-    - LDHV (Low Dominance, High Valence)
-    - LDLV (Low Dominance, Low Valence)
-    - HDLV (High Dominance, Low Valence)
+    VD graph is thus divided into 4 different areas:
+        - NEUTRAL (Low Intensity Values)
+        - HDHV (High Dominance, High Valence)
+        - LDHV (Low Dominance, High Valence)
+        - LDLV (Low Dominance, Low Valence)
+        - HDLV (High Dominance, Low Valence)
+        
+    Parameters
+    ------------
+    gew_emotion : (int, int) 
+         gew emotion tuple *(EMOTION, INTENSITY)*. *EMOTION* is emotion identifier. 
+         You can use `gew.emotions` dictionary to extract the emotion associated with the given id. 
+         *INTENSITY* is the emotion intensity associated to *EMOTION*.
+    min_arousal : int
+        The minimal intensity level to consider emotion as non-neutral.
+         
+    Returns
+    ------------
+    int
+        A class identifier:
+            0. NEUTRAL
+            1. HDHV
+            2. LDHV
+            3. LDLV
+            4. HDLV
     """
     if isinstance(gew_emotion, tuple):
         emotion = gew_emotion[0]
@@ -257,17 +390,40 @@ def gew_to_hldv5(gew_emotion, min_arousal=3):
     
 def gew_to_8(gew_emotion, use_neutral=False, use_different=False, min_arousal=2):
     """
-    Convert a gew emotion of type (EMOTION, INTENSITY) to custom 8 (or 9, or 10, depending on paramters) 
-    classes used in the first phase of the experiment.
+    It Converts a gew emotion tuple *(EMOTION, INTENSITY)* to either 8, 9 or 10 , depending on paramters, 
+    custom classes used in the first pahse of the experiment (data gathering).
     
-    Params:
-    - gew_emotion:  GEW emotion of type (EMOTION, INTENSITY) or Emotion Integer ID
-    - use_neutral: bool, if True use NO EMOTION FELT as neutral class.
-        Emotions with intensity less than min_arousal are also considered as NEUTRAL emotions.
-        if False, NO EMOTION FELT emotions are discarded as incorrect.
-    - use_different: bool, if True use DIFFERENT EMOTION FELT as a different class or (TODO) map into other classes.
-        if False DIFFERENT EMOTION FELT emotions are discarded as incorrect.
-    - min_arousal: int, the minimal intensity level to consider emotion non-neutral. It is not used if gew_emotion is not a tuple
+    Parameters
+    ------------
+    gew_emotion : Union[int, (int, int)] 
+         gew emotion tuple *(EMOTION, INTENSITY)*. *EMOTION* is emotion identifier. 
+         You can use `gew.emotions` dictionary to extract the emotion associated with the given id. 
+         *INTENSITY* is the emotion intensity associated to *EMOTION*.
+         You can also pass only *EMOTION*, without specifying the respective intensity. In this case `min_arousal` is ignored.
+    use_neutral : bool
+        if True use *NO EMOTION FELT* as neutral class.
+        Emotions with intensity levels less than `min_arousal` are also considered as NEUTRAL emotions.
+        if False, *NO EMOTION FELT* emotions are discarded as incorrect.
+    use_different : bool
+        if True use *DIFFERENT EMOTION FELT* as a different class or (TODO) map into other classes.
+        if False *DIFFERENT EMOTION FELT* emotions are discarded as incorrect.
+    min_arousal : int
+        The minimal intensity level to consider emotion as non-neutral. It is ignored if `gew_emotion` is int.
+    
+    Returns
+    ------------
+    int
+        A class identifier:
+            0. Interesse-Divertimento-Orgoglio
+            1. Gioia-Piacere
+            2. Contentezza-Amore-Ammirazione
+            3. Sollievo-Compassione
+            4. Tristezza
+            5. Delusione-Vergogna-Rimpianto-Colpa
+            6. Paura
+            7. Disgusto-Disprezzo-Odio-Rabbia
+            8. NO EMOTION FELT
+            9. DIFFERENT EMOTION FELT
     """
     
     if isinstance(gew_emotion, int):
@@ -317,11 +473,22 @@ def gew_to_8(gew_emotion, use_neutral=False, use_different=False, min_arousal=2)
         
 def gew_to_6a(gew_emotion, min_arousal=0):
     """
-    Convert a gew emotion of type (EMOTION, INTENSITY) to 6 intensity classes.
+    It Converts a gew emotion tuple *(EMOTION, INTENSITY)* to 6 intensity classes.
+    All different *INTENSITY* levels are mapped into different classes.
     
-    Params:
-    - gew_emotion: GEW emotion of type (EMOTION, INTENSITY) or Emotion Integer ID
-    - min_arousal: Not used
+    Parameters
+    ------------
+    gew_emotion : Union[int, (int, int)] 
+         gew emotion tuple *(EMOTION, INTENSITY)*. *EMOTION* is emotion identifier. 
+         You can use `gew.emotions` dictionary to extract the emotion associated with the given id. 
+         *INTENSITY* is the emotion intensity associated to *EMOTION*.
+    min_arousal : int
+        The minimal intensity level to consider emotion as non-neutral. Do not use it: always ignored, used only to standardize conversion interface.
+    
+    Returns
+    ------------
+    int
+        A class identifier corresponding to the given intensity level. It is in range [0, 5].
     """
     if isinstance(gew_emotion, tuple):
         emotion = gew_emotion[0]
@@ -336,11 +503,23 @@ def gew_to_6a(gew_emotion, min_arousal=0):
         
 def gew_to_5a(gew_emotion, min_arousal=0):
     """
-    Convert a gew emotion of type (EMOTION, INTENSITY) to 5 intensity classes.
+    It Converts a gew emotion tuple *(EMOTION, INTENSITY)* to 5 intensity classes.
+    *INTENSITY* levels 0 and 1 are mapped into a single class.
+    All *INTENSITY* levels grater than 1 are mapped into different classes. 
     
-    Params:
-    - gew_emotion: GEW emotion of type (EMOTION, INTENSITY) or Emotion Integer ID
-    - min_arousal: Not used
+    Parameters
+    ------------
+    gew_emotion : Union[int, (int, int)] 
+         gew emotion tuple *(EMOTION, INTENSITY)*. *EMOTION* is emotion identifier. 
+         You can use `gew.emotions` dictionary to extract the emotion associated with the given id. 
+         *INTENSITY* is the emotion intensity associated to *EMOTION*.
+    min_arousal : int
+        The minimal intensity level to consider emotion as non-neutral. Do not use it: always ignored, used only to standardize conversion interface.
+    
+    Returns
+    ------------
+    int
+        A class identifier corresponding to the given intensity level. It is in range [0, 4].
     """
     if isinstance(gew_emotion, tuple):
         emotion = gew_emotion[0]
@@ -357,15 +536,25 @@ def gew_to_5a(gew_emotion, min_arousal=0):
         
 def gew_to_emotion(gew_emotion, min_arousal=0):
     """
-    Convert a gew emotion of type (EMOTION, INTENSITY) to 20 emotion classes.
-    Neutral class (NO EMOTION FELT) is considered as a separate class.
-    Emotions with low arousal are considered neutral emotions.
-    The minimal intensity level to consider emotion non-neutral is specified by min_arousal parameter.
-    Other classes (DIFFERENT EMOTIONS) are considered as a separated class.
+    It Converts a gew emotion tuple *(EMOTION, INTENSITY)* 20 emotion classes.
+    Neutral class (*NO EMOTION FELT*) is considered as a separate class.
+    Emotions with low *INTENSITY* (arousal) are considered neutral emotions.
+    The minimal intensity level to consider emotion as non-neutral is specified by `min_arousal` parameter.
+    Other classes (*DIFFERENT EMOTIONS*) are considered as a class.
     
-    Params:
-    - gew_emotion: GEW emotion of type (EMOTION, INTENSITY) or Emotion Integer ID
-    - min_arousal: int, minimal arousal to consider it as non-neutral emotion
+    Parameters
+    ------------
+    gew_emotion : (int, int) 
+         gew emotion tuple *(EMOTION, INTENSITY)*. *EMOTION* is emotion identifier. 
+         You can use `gew.emotions` dictionary to extract the emotion associated with the given id. 
+         *INTENSITY* is the emotion intensity associated to *EMOTION*.
+    min_arousal : int
+        The minimal intensity level to consider emotion as non-neutral.
+        
+    Returns
+    ------------
+    int
+        A class identifier. You can use `gew.emotions` dictionary to extract the emotion associated with the returned identifier.
     """
     if isinstance(gew_emotion, tuple):
         emotion = gew_emotion[0]
@@ -385,14 +574,21 @@ def get_data_distribution(gew_labels, num_classes, transform_function, **args):
     """
     Get data distribution of data, given original gew labels and a transform function.
     
-    Params:
-    - gew_labels: dataset labels. Please provide a list of tuple in GEW format (EMOTION_ID, INTENSITY)
-    - num_classes: number of classes otteined with the transform_function
-    - transform_function: function used to convert gew emotion into class id
-    - ** args: named args to be passed to transform_function
+    Parameters
+    ------------
+    gew_labels : list of tuple
+        Dataset labels. Please provide a list of gew emotion tuple in the format *(EMOTION, INTENSITY)*.
+    num_classes : int 
+        Number of classes obtained with `transform_function`
+    transform_function : function
+        Function to be used to convert `gew_labels` into a list of class identifiers. You can use one of `gew_to_xxx` functions of the present module, but also a custom function.
+    **args 
+        Named args to be passed to `transform_function`
     
-    Returns:
-    - a list of size num_classes, whose i-th entry is the number of occurencies in the dataset that has been mapped to i-th class
+    Returns
+    ------------
+    list of int
+        List of size `num_classes`, whose i-th entry is the number of occurencies in the dataset that has been mapped to i-th class.
     """
     
     new_labels = []
@@ -405,15 +601,21 @@ def get_data_distribution(gew_labels, num_classes, transform_function, **args):
 def plot_data_distribution(gew_labels, transform_function, normalize=True, verbose=False, **args):
     """
     Plot data distributions of data, given original gew labels and a transform function.
-    If transform_function output depends on arousal parameter, data are plotted with all possible min_arousal values
-    in n different bar plots, one for each min_arousal value.
+    If `transform_function` output depends on arousal parameter, data are plotted with all possible `min_arousal` values
+    in *n* different bar plots, one for each `min_arousal` value.
     
-    Params:
-    - gew_labels: dataset labels. Please provide a list of tuple in GEW format (EMOTION_ID, INTENSITY)
-    - verbose: if True, print some additional infos (used for debug)
-    - normalize: if True, normalize output counts into [0, 1] range
-    - transform_function: function used to convert gew emotion into class id
-    - ** args: named args to be passed to transform_function
+    Parameters
+    ----------------
+    gew_labels : list of tuple
+        Dataset labels. Please provide a list of gew emotion tuple in the format *(EMOTION, INTENSITY)*.
+    verbose : bool
+        if True, print some additional infos (used for debug).
+    normalize : bool
+        if True, normalize output counts into [0, 1] range.
+    transform_function : function
+        Function to be used to convert `gew_labels` into a list of class identifiers. You can use one of `gew_to_xxx` functions of the present module, but also a custom function.
+    **args 
+        Named args to be passed to `transform_function`
     """
     
     # configure subplots, fig_size, ticks and plt params
@@ -467,14 +669,19 @@ def plot_data_distribution(gew_labels, transform_function, normalize=True, verbo
 def plot_data_distribution_grouped(gew_labels, transform_function, verbose = False, **args):
     """
     Plot data distributions of data, given original gew labels and a transform function.
-    If transform_function output depends on arousal parameter, data are plotted with all possible min_arousal values
+    If `transform_function` output depends on arousal parameter, data are plotted with all possible `min_arousal` values
     in a single grouped bar plot.
     
-    Params:
-    - gew_labels: dataset labels. Please provide a list of tuple in GEW format (EMOTION_ID, INTENSITY)
-    - verbose: if True, print some additional infos (used for debug)
-    - transform_function: function used to convert gew emotion into class id
-    - ** args: named args to be passed to transform_function
+    Parameters
+    ----------------
+    gew_labels : list of tuple
+        Dataset labels. Please provide a list of gew emotion tuple in the format *(EMOTION, INTENSITY)*.
+    verbose : bool
+        if True, print some additional infos (used for debug).
+    transform_function : function
+        Function to be used to convert `gew_labels` into a list of class identifiers. You can use one of `gew_to_xxx` functions of the present module, but also a custom function.
+    **args 
+        Named args to be passed to `transform_function`
     """
     
     # configure subplots, fig_size, ticks and plt params
