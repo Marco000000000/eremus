@@ -31,8 +31,6 @@ import re
 import mne
 import pandas as pd
 import matplotlib.pyplot as plt
-get_ipython().run_line_magic('matplotlib', '')
-
 
 # In[2]:
 

@@ -10,6 +10,35 @@ import torch.optim
 import numpy as np
 
 class Model(nn.Module):
+    """
+    It defines a Convolutional Neural Network, SyncNet, adapted to EREMUS samples with extracted features in frequency-domain.
+    Network is adapated for samples of size *(B, C, F, S)*, being *B* the batch size, *C* the number of EEG channels, *F* the number of extracted features and *S* the number of frequency bands.
+    This particular implementation fits *S*=5. Other values for *S* were not tested.
+
+    Arguments
+    -------------
+    args : dict
+        A dictionary containing the following keys:
+        
+        num_channels : int
+            The number of channels *C*. Default to 32.
+        input_size : int
+            The number of features *F*. Default to 19.
+        num_classes : int
+            The number of classes. Default to 4.
+        num_filters : int
+            Default to 1. Don't change it.
+        filter_width : int
+            Default to 40. Don't change it.
+        pool_size : int
+            Default to 40. Don't change it.
+        verbose : bool
+            If True, tensors sizes are printed at the end of each layer.
+    
+    See also
+    --------------
+    eremus.models.syncnet_eremus: a different version of SyncNet adapted for samples in time domain.
+    """
     def __init__(self,args):
         super(Model, self).__init__()
         args_defaults=dict(num_channels=8, input_size=1266, num_classes=2, num_filters=1, filter_width = 40, pool_size=40, verbose=False)
@@ -44,6 +73,17 @@ class Model(nn.Module):
         self.classifier = nn.Linear(self.input_size,self.num_classes)
     
     def forward(self,X):
+        """
+        Parameters
+        -------------
+        x : torch.Tensor
+            *x*  must be of size  *(B, C, F, S)*, being *B* the batch size, *C* the number of EEG channels, *F* the number of extracted features and *S* the number of frequency bands.
+        
+        Returns
+        ----------
+        torch.Tensor
+            A tensor of size *(B, NC)*, being *B* the batch size, and *NC* the number of classes.
+        """
         #X must be in the form of BxCx1xT or BxCxT
         self.W_osc = torch.mul(self.b,torch.cos(self.t*self.omega + self.phi_ini))
         self.W_decay = torch.exp(-torch.pow(self.t,2)*self.beta)

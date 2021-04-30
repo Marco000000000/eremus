@@ -3,9 +3,6 @@
 
 # ## Spatial Filtering
 
-# In[1]:
-
-
 import mne
 import json
 import numpy as np
@@ -39,30 +36,31 @@ ch_dict = {k+3: v for k, v in enumerate(ch_names)}
 # create a dict that maps channel names to dig points indices
 ch_dict_r = {k: v+3 for v, k in enumerate(ch_names)}
 
-
-# In[4]:
-
-
 # extract positions
 positions = [montage.dig[ch_dict_r[c]]['r'] for c in ch_names]
 
 
-# In[5]:
-
 
 def get_nn_for_channel(channel, nn_max_index=7, verbose=False):
     """
-    Calculate the N = nn_max_index nearest neighbors of the selected channel
+    Calculate the N = *nn_max_index* nearest neighbors of the selected channel.
     
-    Params:
-    channel - target channel for distance calculus. It must be provided with the name (i.e 'Cz', 'PO10', etc.)
-    nn_max_index - number of nearest neighbors to find
-    verbose - if True, print infos for debug
+    Parameters
+    -------------
+    channel : str
+        Target channel for distance calculus. It must be provided with channel name (i.e 'Cz', 'PO10', etc.)
+    nn_max_index : int 
+        The number of nearest neighbors to find.
+    verbose : bool
+        If True, print information for debug purpose.
     
-    Returns:
-    A list of int: positions of the N = nn_max_index nearest neighbors of the selected channel
+    Returns
+    -----------
+    list[int] 
+        positions of the N = *nn_max_index* nearest neighbors of the selected channel.
     """
-    
+    if channel not in ch_names:
+        raise ValueError("Please provide a valid channel name. You could find allowed values in spatial_filter.ch_names list")
     # calculate distances from channel
     dist_from_channel = []
     for c in ch_names:
@@ -90,19 +88,24 @@ def get_nn_for_channel(channel, nn_max_index=7, verbose=False):
 # iter the last function for each target channel
 def nn(nn_max_index=7):
     """
-    Calculate the N = nn_max_index nearest neighbors of all channels
+    Calculate the N = *nn_max_index* nearest neighbors for all channels.
     
-    Params:
-    nn_max_index - number of nearest neighbors to find
-    verbose - if True, print infos for debug
+    Parameters
+    --------------
+    nn_max_index : int 
+        The number of nearest neighbors to find.
+    verbose : bool
+        If True, print information for debug purpose.
     
-    Returns:
-    A table dictionary:
-        -nn_dict['ch_name'][i] returns the name of the i_th target channel
-        -nn_dict['ch_pos'][i] returns the position of the i_th target channel
-        -nn_dict['nn_names'][i] returns the names of the N = nn_max_index nearest neighbors for target channel
-        -nn_dict['nn_pos'][i] returns the positions of the N = nn_max_index nearest neighbors for target channel
-        -nn_dict['nn_dist'][i] returns the distances of the N = nn_max_index nearest neighbors for target channel
+    Returns
+    ---------------
+    dict
+        Supposing you are saving the return value in nn_dict:
+            - nn_dict['ch_name'][i] returns the name of the i_th target channel
+            - nn_dict['ch_pos'][i] returns the position of the i_th target channel
+            - nn_dict['nn_names'][i] returns the names of the N = nn_max_index nearest neighbors for target channel
+            - nn_dict['nn_pos'][i] returns the positions of the N = nn_max_index nearest neighbors for target channel
+            - nn_dict['nn_dist'][i] returns the distances of the N = nn_max_index nearest neighbors for target channel
     """
     
     # create the empty dict
@@ -128,10 +131,6 @@ def nn(nn_max_index=7):
         
     return nn_dict
 
-
-# In[6]:
-
-
 # calculate dictionary of nn for each channel
 nn_dict = nn(nn_max_index=32)
 
@@ -144,15 +143,19 @@ dist = np.array([np.array(a) for a in nn_df['nn_dist']])
 # provide weigths in function of distances
 def get_weights(distance):
     """
-    Given a distance (or an array of distances), calculate the corresponding weigth to associate in average calculus.
+    Given a distance (or an array of distances), calculate the corresponding weigth to associate in average calculus. 
     The weight is proportional to the inverse of the distance. 
     If distance = 0 (distance of sensors from themselves) weight is 1.
     If distance = dist.max() (max distance beetween two sensor locations in the 10-20 system) weight is 0.
     
-    Params:
-    distance: float or numpy array. Single distance or Array of distances.
-    Returns:
-    the corresponding weigth to associate in average calculus
+    Parameters
+    ------------
+    distance : Union[float, numpy.ndarray] 
+        Single distance or Array of distances.
+    Returns
+    ------------
+    Union[float, numpy.ndarray] 
+        The corresponding weigth/s that associate with distance/s in average calculus.
     """
     
     global dist
@@ -165,21 +168,26 @@ def get_weights(distance):
 
 def spatial_filter(raw, N=7, weighted=True, return_only_data=False):
     """
-    Calculate the Spatial filter for a given Raw (or for a given numpy array of dim [N_CHAN, N_TIME_POINTS]).
+    Calculate the Spatial filter for a given Raw (or for a given numpy array of shape *(N_CHAN, N_TIME_POINTS)*).
     Values of each channel are averaged with those of the first N nearest neighbors.
     Mean may be simple or weigthed in function of distance.
     
-    Params:
-    raw - Union[mne.io.RawXXX, numpy.ndarray], data to filter,
-    N - Number of nearest neighbors involved in averaging,
-    weighted - if True, selecet the type of mean to weighted,
-    return_only_data - change the type of return value.
+    Parameters
+    --------------
+    raw : Union[mne.io.RawXXX, numpy.ndarray]
+        EEG raw data to filter.
+    N : int
+        The number of nearest neighbors involved in averaging.
+    weighted : bool
+        If True, select the type of mean to *weighted*.
+    return_only_data : bool
+        If True, it always returns numpy.ndarray, i.e. the filtered data are not wrapped in a Raw object.
+        If False, and *raw* is a Raw object, it returns a new Raw object with filtered data.
     
-    Returns:
-    if return_only_data is False and input is Raw:
-        a new Raw object with filtered data
-    else:
-        a array containing filtered data (not wrapped in Raw object)
+    Returns
+    ------------------
+    Union[mne.io.RawXXX, numpy.ndarray]
+        The filtered data. If *return_only_data* is False and *raw* is Raw, it returns a new Raw object with filtered data, otherwise an array containing filtered data (not wrapped in Raw object).
     """
     # check N
     assert N<=32, "N must be in range(num_channels), number of chans is 32 in EREMUS"

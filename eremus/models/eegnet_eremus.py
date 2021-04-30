@@ -13,11 +13,35 @@ import torch.backends.cudnn as cudnn; cudnn.benchmark = True
 import numpy as np
     
 class Model(nn.Module):
+    """
+    It defines a Convolutional Neural Network, EEGNet, adapted to EREMUS samples.
+    Network is adapated for samples of size *(B, C, T)*, being *B* the batch size, *C* the number of EEG channels, and *T* the number of time-points.
+    This particular implementation accepts only *T* = 640 time-points. If you want to customize the number of *T* you must play
+    with some parameters through convolutional layers, as kernel size and stride. 
+    We suggest to modify only the input size of the fully connected layer to fit your *T* size.
+
+    Arguments
+    -------------
+    args : dict
+        A dictionary containing the following keys:
+        
+        num_channels : int
+            The number of channels. Default to 32.
+        num_classes : int
+            The number of classes. Default to 4.
+        verbose : bool
+            If True, tensors sizes are printed at the end of each layer.
+    
+    See also
+    --------------
+    eremus.models.eegnet_eremus_fe : a different version of EEGNet adapted for samples with extracted features
+    eremus.models.eegnet_eremus_fe_v2 : a different version of EEGNet adapted for frequency-bands
+    """
 
     def __init__(self, args):
         super(Model, self).__init__()
-        args_defaults=dict(num_channels=182, num_classes=10, verbose=False)
-        for arg,default in args_defaults.items():
+        args_defaults=dict(num_channels=32, num_classes=4, verbose=False)
+        for arg, default in args_defaults.items():
             setattr(self, arg, args[arg] if arg in args and args[arg] is not None else default)
     
         # Layer 1
@@ -38,11 +62,22 @@ class Model(nn.Module):
         
         # FC Layer
         # NOTE: This dimension will depend on the number of timestamps per sample in your data.
-        # I have 1266 timepoints. 
+        # I have 640 timepoints. 
         self.fc1 = nn.Linear(320, self.num_classes)
         
 
     def forward(self, x):
+        """
+        Parameters
+        -------------
+        x : torch.Tensor
+            *x*  must be of size *(B, C, T)*, being *B* the batch size, *C* the number of EEG channels, and *T* the number of time-points.
+        
+        Returns
+        ----------
+        torch.Tensor
+            A tensor of size *(B, NC)*, being *B* the batch size, and *NC* the number of classes.
+        """
         if self.verbose:
             print(x.size())
         x = x.unsqueeze(1)

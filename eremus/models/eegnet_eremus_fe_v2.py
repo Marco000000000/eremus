@@ -13,15 +13,39 @@ import torch.backends.cudnn as cudnn; cudnn.benchmark = True
 import numpy as np
     
 class Model(nn.Module):
+    """
+    It defines a Convolutional Neural Network, EEGNet, adapted to EREMUS samples with extracted features in frequency-domain.
+    Network is adapated for samples of size *(B, C, F, S)*, being *B* the batch size, *C* the number of EEG channels, *F* the number of extracted features and *S* the number of frequency bands.
+    This particular implementation fits only *F* = 19 and *S*=5. If you want to customize the number of *F* you must set it into *args* and play with some parameters through convolutional layers, as kernel size and stride. 
+    We suggest to modify only the input size of the fully connected layer to fit your *F* size.
 
+    Arguments
+    -------------
+    args : dict
+        A dictionary containing the following keys:
+        
+        input_size : int
+            The size of input features. Default to 19.
+        num_channels : int
+            The number of channels. Default to 32.
+        num_classes : int
+            The number of classes. Default to 4.
+        verbose : bool
+            If True, tensors sizes are printed at the end of each layer.
+    
+    See also
+    --------------
+    eremus.models.eegnet_eremus: a different version of EEGNet adapted for samples in time domain.
+    eremus.models.eegnet_eremus_fe : a different version of EEGNet adapted for samples with extracted features.
+    """
     def __init__(self, args):
         super(Model, self).__init__()
-        args_defaults=dict(num_channels=182, num_classes=10, verbose=False)
+        args_defaults=dict(input_size=19, num_channels=32, num_classes=4, verbose=False)
         for arg,default in args_defaults.items():
             setattr(self, arg, args[arg] if arg in args and args[arg] is not None else default)
     
         # Layer 1
-        self.conv1 = nn.Conv2d(19, 32, (1, self.num_channels), padding = 0)
+        self.conv1 = nn.Conv2d(self.input_size, 32, (1, self.num_channels), padding = 0)
         self.batchnorm1 = nn.BatchNorm2d(32, False)
         
         # Layer 2
@@ -37,12 +61,22 @@ class Model(nn.Module):
         self.pooling3 = nn.MaxPool2d((2, 4))
         
         # FC Layer
-        # NOTE: This dimension will depend on the number of timestamps per sample in your data.
-        # I have 1266 timepoints. 
+        # NOTE: This dimension will depend on the number of features per sample in your data.
         self.fc1 = nn.Linear(32, self.num_classes)
         
 
     def forward(self, x):
+        """
+        Parameters
+        -------------
+        x : torch.Tensor
+            *x*  must be of size  *(B, C, F, S)*, being *B* the batch size, *C* the number of EEG channels, *F* the number of extracted features and *S* the number of frequency bands.
+        
+        Returns
+        ----------
+        torch.Tensor
+            A tensor of size *(B, NC)*, being *B* the batch size, and *NC* the number of classes.
+        """
         if self.verbose:
             print(x.size())
         # [B, C, F, S] --> [B, F, S, C]

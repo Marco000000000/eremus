@@ -12,7 +12,6 @@ eremus.hello.test module
    :undoc-members:
    :show-inheritance:
 
-
 Module contents
 ---------------
 

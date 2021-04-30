@@ -76,7 +76,6 @@ eremus.models.syncnet\_eremus\_fe module
    :undoc-members:
    :show-inheritance:
 
-
 Module contents
 ---------------
 

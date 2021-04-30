@@ -4,6 +4,14 @@ eremus.utils package
 Submodules
 ----------
 
+eremus.utils.ADL module
+-----------------------
+
+.. automodule:: eremus.utils.ADL
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 eremus.utils.config module
 --------------------------
 
@@ -43,7 +51,6 @@ eremus.utils.saver module
    :members:
    :undoc-members:
    :show-inheritance:
-
 
 Module contents
 ---------------

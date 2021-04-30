@@ -1,5 +1,6 @@
 import re
 import sys
+import warnings
 import numpy as np
 import pandas as pd
 from typing import NamedTuple
@@ -83,7 +84,7 @@ def dumps(rating):
     
     Parameters
     ------------
-    rating : Union(pandas.core.series.Series, dict)
+    rating : Union[pandas.core.series.Series, dict]
         a rating row or a dictionary. It must be contain emotion families *gew_fam1* and *gew_fam2* as strings and emotion intensities *gew_int1* and *gew_int2* as integers.
        
     Returns
@@ -104,6 +105,8 @@ def dumps(rating):
     [(0, 4), (10, 2)]
     
     """
+    if type(rating)!=pd.core.series.Series and type(rating)!=dict:
+        raise TypeError("Rating must be pd.core.series.Series or dict, not" + str(type(rating)))
     # access ratings once
     fam1 = rating['gew_fam1']
     int1 = rating['gew_int1']
@@ -111,15 +114,15 @@ def dumps(rating):
     int2 = rating['gew_int2']
     # type checking
     if(type(fam1)!=str):
-        print(type(fam1))
+        raise TypeError("Rating family (first emotion) is expected to be a string, " + str(type(fam1)) + " received!")
     if(type(fam2)!=str):
-        print(type(fam2))
+        raise TypeError("Rating family (second emotion) is expected to be a string, " + str(type(fam2)) + " received!")
     # check different emotion for fam1
     if(re.search(emotions[21], fam1)!=None):
         different_emotion = fam1.split(' - ')
         fam1 = different_emotion[0]
         different_emotion = different_emotion[1]
-        print(different_emotion)
+        print("A different emotion was detected: " + different_emotion)
     # convert first rating
     gew1 = (reverse_emotions[fam1], int1)
     # check the presence of second emotion
@@ -131,7 +134,7 @@ def dumps(rating):
             different_emotion = fam2.split(' - ')
             fam2 = different_emotion[0]
             different_emotion = different_emotion[1]
-            print(different_emotion)
+            print("A different emotion was detected: " + different_emotion)
         # convert second rating
         gew2 = (reverse_emotions[fam2], int2)
         return [gew1, gew2]
@@ -158,6 +161,16 @@ def loads(rating):
     	gew_fam1	gew_int1	gew_fam2	gew_int2
     0	Vergogna	2		Paura		4
     """
+    
+    if type(rating) is not list:
+        raise TypeError("Rating must be list, not" + str(type(rating)))
+    if len(rating)<2:
+        raise Exception("Rating must be a list of two tuples, only " + str(len(rating)) + " element/s were given")
+    elif len(rating)>2:
+        warnings.warn("Only the first two ratings are used for computation, the other " + str(len(rating) - 2) + " element/s will be ignored")
+    if type(rating[0]) is not tuple or (type(rating[1]) is not tuple and rating[1]!=None):
+        raise TypeError("Rating items must be tuples, not" + str(type(rating[0])))
+                      
     gew1 = rating[0]
     gew2 = rating[1]
     result = {}
@@ -219,13 +232,13 @@ def dump(gew):
     return (reverse_emotions[gew.emotion], gew.intensity)
     
 # convert a tuple in a GEW object
-def load(t_gew):
+def load(t_gew : tuple):
     """
     It converts a *(emotion_id, intensity)* formatted tuple in GEW object. 
     
     Parameters
     ------------
-    gew : tuple
+    t_gew : tuple
         A *(emotion_id, intensity)* formatted tuple.
         
        
@@ -245,6 +258,48 @@ def load(t_gew):
 #- plot data distributions, given a transform function and a ds
 #- get data distribution, given a transform function
 
+def _checkGewEmotionFormat(gew_emotion, neutral_allowed=True, different_allowed=True, single_id_allowed=True):
+    #check type
+    if single_id_allowed and type(gew_emotion)!=tuple and type(gew_emotion)!=int:
+        raise TypeError("Not Valid Emotion. Please provide emotion in gew format (Emotion, Intensity) or an iteger emotion id.")
+    if not single_id_allowed and type(gew_emotion)!=tuple:
+        raise TypeError("Not Valid Emotion. Please provide emotion in gew format (Emotion, Intensity).")
+    #check tuple format
+    if isinstance(gew_emotion, tuple):
+        #check length
+        if len(gew_emotion)<2:
+            raise Exception("Not Valid Emotion. Please provide emotion in gew format (Emotion, Intensity).")
+        #check types
+        if type(gew_emotion[0])!=int:
+            raise TypeError("(Emotion, Intensity) format accepts only integers, not " + str(type(gew_emotion[0])) + ".")
+        if type(gew_emotion[1])!=int:
+            raise TypeError("(Emotion, Intensity) format accepts only integers, not " + str(type(gew_emotion[1])) + ".")
+        emotion = gew_emotion[0]
+        intensity = gew_emotion[1]
+        #check intensity values
+        if intensity>5 or intensity<0:
+            raise ValueError("Intensity values must be in range [0, 5], you provided " + str(intensity) + ".")
+    else:
+        if type(gew_emotion)!=int:
+            raise TypeError("Emotion ID must be integer, not " + str(type(gew_emotion[0])) + ".")
+        emotion = gew_emotion
+    #check emotion values
+    if not different_allowed and not neutral_allowed:
+        correct_value_condition = emotion in range(20)
+        s = '[0, 19]'
+    elif not different_allowed and neutral_allowed:
+        correct_value_condition = emotion in range(21)
+        s = '[0, 20]'
+    elif different_allowed and neutral_allowed:
+        correct_value_condition = emotion in range(22)
+        s = '[0, 21]' 
+    elif different_allowed and not neutral_allowed:
+        correct_value_condition = emotion in range(20) or emotion==21
+        s = '[0, 19] U 21'   
+    if not correct_value_condition:
+        raise ValueError("Emotion values must be in range " + s + ", you provided " + str(emotion) + ".")
+    
+
 # CONVERSION OF GEW EMOTIONS INTO VALENCE-AROUSAL-DOMINANCE MODEL
 def vad_coordinates(gew_emotion):
     """
@@ -262,6 +317,7 @@ def vad_coordinates(gew_emotion):
     (float, float, float)
         Valence-Arousal-Dominance coordinates (V, A, D). All values are expressed in [-1, 1] range.
     """
+    _checkGewEmotionFormat(gew_emotion, neutral_allowed=True, different_allowed=False, single_id_allowed=False)
     V, D = vd_coordinates[gew_emotion[0]]
     A = round(2*gew_emotion[1]/5 - 1, 2)
     
@@ -302,17 +358,13 @@ def gew_to_hldv4(gew_emotion, min_arousal=0):
             2. LDLV
             3. HDLV
     """
+    _checkGewEmotionFormat(gew_emotion, neutral_allowed=False, different_allowed=False, single_id_allowed=True)
     if isinstance(gew_emotion, int):
         emotion = gew_emotion
     elif isinstance(gew_emotion, tuple):
         emotion = gew_emotion[0]
-    else:
-        raise Exception('Emotion not valid: please provide emotion in gew format (Emotion, Intensity) or with a Emotion iteger id')
-    # discard DIFFERENT EMOTION and NO EMOTION
-    if emotion==21 or emotion==20:
-        raise Exception('Emotion field of gew_emotion out of range: emotion id should be less than 20')
     # HDHV
-    elif emotion<5:
+    if emotion<5:
         return 0
     # LDHV
     elif emotion>=5 and emotion<10:
@@ -323,8 +375,6 @@ def gew_to_hldv4(gew_emotion, min_arousal=0):
     # HDLV
     elif emotion>=15 and emotion<20:
         return 3
-    else:
-        raise Exception('Emotion not valid')
     
 def gew_to_hldv5(gew_emotion, min_arousal=3):
     """
@@ -362,16 +412,11 @@ def gew_to_hldv5(gew_emotion, min_arousal=3):
             3. LDLV
             4. HDLV
     """
-    if isinstance(gew_emotion, tuple):
-        emotion = gew_emotion[0]
-        arousal = gew_emotion[1]
-    else:
-        raise Exception('Emotion not valid: please provide emotion in gew format (Emotion, Intensity)')
-    # discard DIFFERENT EMOTION 
-    if emotion==21:
-        raise Exception('Emotion field of gew_emotion out of range: emotion id should be less than 20')
+    _checkGewEmotionFormat(gew_emotion, neutral_allowed=True, different_allowed=False, single_id_allowed=False)
+    emotion = gew_emotion[0]
+    arousal = gew_emotion[1]
     # Neutral emotions
-    elif emotion==20 or arousal<min_arousal:
+    if emotion==20 or arousal<min_arousal:
         return 0
     # HDHV
     elif emotion<5:
@@ -385,8 +430,6 @@ def gew_to_hldv5(gew_emotion, min_arousal=3):
     # HDLV
     elif emotion>=15 and emotion<20:
         return 4
-    else:
-        raise Exception('Emotion not valid')
     
 def gew_to_8(gew_emotion, use_neutral=False, use_different=False, min_arousal=2):
     """
@@ -425,34 +468,19 @@ def gew_to_8(gew_emotion, use_neutral=False, use_different=False, min_arousal=2)
             8. NO EMOTION FELT
             9. DIFFERENT EMOTION FELT
     """
-    
+    _checkGewEmotionFormat(gew_emotion, neutral_allowed=use_neutral, different_allowed=use_different, single_id_allowed=True)
     if isinstance(gew_emotion, int):
         emotion = gew_emotion
-        # DIFFERENT EMOTION FELT
-        if emotion == 21 and use_different:
-            return 9
-        # NO EMOTION FELT
-        if emotion == 20:
-            if use_neutral:
-                return 8
-            else: raise Exception('Emotion field of gew_emotion out of range: emotion id should be less than 20')
+        arousal = min_arousal     
     elif isinstance(gew_emotion, tuple):
         emotion = gew_emotion[0]
         arousal = gew_emotion[1]
-        # DIFFERENT EMOTION FELT
-        if emotion == 21 and use_different:
-            return 9
-        # NO EMOTION FELT
-        if emotion == 20:
-            if use_neutral:
-                return 8
-            else: raise Exception('Emotion field of gew_emotion out of range: emotion id should be less than 20')
-        if use_neutral and arousal<min_arousal:
-            return 8
-    else:
-        raise Exception('Emotion not valid: please provide emotion in gew format (Emotion, Intensity) or with a Emotion iteger id')
 
-    if emotion in range(0, 3):
+    if emotion == 21:
+        return 9
+    elif use_neutral and (emotion == 20 or arousal < min_arousal):
+        return 8
+    elif emotion in range(0, 3):
         return 0
     elif emotion in range(3, 5):
         return 1
@@ -468,8 +496,6 @@ def gew_to_8(gew_emotion, use_neutral=False, use_different=False, min_arousal=2)
         return 6
     elif emotion in range(16, 20):
         return 7
-    else:
-        raise Exception('Emotion not valid')
         
 def gew_to_6a(gew_emotion, min_arousal=0):
     """
@@ -490,16 +516,8 @@ def gew_to_6a(gew_emotion, min_arousal=0):
     int
         A class identifier corresponding to the given intensity level. It is in range [0, 5].
     """
-    if isinstance(gew_emotion, tuple):
-        emotion = gew_emotion[0]
-        arousal = gew_emotion[1]
-        # NO EMOTION FELT
-        if emotion == 20 or emotion == 21:
-            raise Exception('Emotion field of gew_emotion out of range: emotion id should be less than 20')
-        else:
-            return arousal
-    else:
-        raise Exception('Emotion not valid: please provide emotion in gew format (Emotion, Intensity)')
+    _checkGewEmotionFormat(gew_emotion, neutral_allowed=False, different_allowed=False, single_id_allowed=False)
+    return gew_emotion[1]
         
 def gew_to_5a(gew_emotion, min_arousal=0):
     """
@@ -521,18 +539,12 @@ def gew_to_5a(gew_emotion, min_arousal=0):
     int
         A class identifier corresponding to the given intensity level. It is in range [0, 4].
     """
-    if isinstance(gew_emotion, tuple):
-        emotion = gew_emotion[0]
-        arousal = gew_emotion[1]
-        # NO EMOTION FELT
-        if emotion == 20 or emotion == 21:
-            raise Exception('Emotion field of gew_emotion out of range: emotion id should be less than 20')
-        elif arousal==0:
-            return 0
-        else:
-            return arousal - 1
+    _checkGewEmotionFormat(gew_emotion, neutral_allowed=False, different_allowed=False, single_id_allowed=False)
+    arousal = gew_emotion[1]
+    if arousal == 0:
+        return 0
     else:
-        raise Exception('Emotion not valid: please provide emotion in gew format (Emotion, Intensity)')
+        return arousal - 1
         
 def gew_to_emotion(gew_emotion, min_arousal=0):
     """
@@ -556,20 +568,17 @@ def gew_to_emotion(gew_emotion, min_arousal=0):
     int
         A class identifier. You can use `gew.emotions` dictionary to extract the emotion associated with the returned identifier.
     """
-    if isinstance(gew_emotion, tuple):
-        emotion = gew_emotion[0]
-        arousal = gew_emotion[1]
-        if emotion==21:
-            return 21
-        elif arousal<min_arousal:
-            return 20
-        else:
-            return emotion
+    _checkGewEmotionFormat(gew_emotion, neutral_allowed=True, different_allowed=True, single_id_allowed=False)
+    emotion = gew_emotion[0]
+    arousal = gew_emotion[1]
+    if emotion==21:
+        return 21
+    elif arousal<min_arousal:
+        return 20
     else:
-        raise Exception('Emotion not valid: please provide emotion in gew format (Emotion, Intensity)')
+        return emotion
 
 # GET DATA DISTRIBUTIONS
-
 def get_data_distribution(gew_labels, num_classes, transform_function, **args):
     """
     Get data distribution of data, given original gew labels and a transform function.

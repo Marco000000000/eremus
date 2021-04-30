@@ -12,7 +12,6 @@ eremus.trainers.trainer\_eremus module
    :undoc-members:
    :show-inheritance:
 
-
 Module contents
 ---------------
 

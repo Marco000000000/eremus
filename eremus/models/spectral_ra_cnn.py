@@ -8,36 +8,50 @@ import torch.optim
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
+from eremus.utils.ADL import Adl_4d
 from torchvision import transforms, datasets
 import torch.backends.cudnn as cudnn; cudnn.benchmark = True
 import torch; torch.utils.backcompat.broadcast_warning.enabled = True
 
-def Adl_2d(x):
-    w = x.size(-1)
-    w_2 = int(w/2)
-    sx = x[:, :w_2]
-    dx = x[:, -w_2:]
-    return sx - dx.flip(-1)
-
-def Adl_3d(x):
-    w = x.size(-1)
-    w_2 = int(w/2)
-    sx = x[:, :, :w_2]
-    dx = x[:, :, -w_2:]
-    return sx - dx.flip(-1)
-
-def Adl_4d(x):
-    w = x.size(-1)
-    w_2 = int(w/2)
-    sx = x[:, :, :, :w_2]
-    dx = x[:, :, :, -w_2:]
-    return sx - dx.flip(-1)
-
 class Model(nn.Module):
-
+    """
+    It implements a frequency domain Regional Asymmetric Convolutional Neural Network.
+    Network is adapated for samples of size *(B, 9, 9, F, S)*, being *B* the batch size, *F* the number of features, *S* the number of frequency bands.
+    This particular implementation accepts only *S* = 5 frequency bands. If you want to customize the number of *S* you must play
+    with some parameters through convolutional layers, as kernel size and stride, or you should add more layers.
+   
+    Arguments
+    -------------
+    args : dict
+        A dictionary containing the following keys:
+        
+        input_size : int
+            The size of input features. Default to 19.
+        num_classes : int
+            The number of classes. Default to 4.
+        verbose : bool
+            If True, tensors sizes are printed at the end of each convolutional layer.
+    
+    See also
+    --------------
+    eremus.models.ra_cnn : a different version of RA-CNN adapted for 1280 time-points
+    eremus.models.ra_cnn_debug : a different version of RA-CNN with lot of debug information
+    eremus.models.ra_cnn_640 : a different version of RA-CNN adapted for 640 time-points
+    
+    References
+    ---------------
+    Heng Cui, Aiping Liu, Xu Zhang, Xiang Chen, Kongqiao Wang, Xun Chen, 
+    EEG-based emotion recognition using an end-to-end regional-asymmetric convolutional neural network,
+    Knowledge-Based Systems,
+    Volume 205,
+    2020,
+    106243,
+    ISSN 0950-7051,
+    https://doi.org/10.1016/j.knosys.2020.106243.
+    """
     def __init__(self, args):
         super(Model, self).__init__()
-        args_defaults=dict(num_channels=32, num_classes=4, verbose=False)
+        args_defaults=dict(input_size=19, num_classes=4, verbose=False)
         for arg,default in args_defaults.items():
             setattr(self, arg, args[arg] if arg in args and args[arg] is not None else default)
     
@@ -46,7 +60,7 @@ class Model(nn.Module):
             
             # Layer 1
             # Set input size to number of features
-            nn.Conv3d(19, 32, (1, 1, 2)),#, stride=(1, 1, 2)), #padding = (0, 0, 2),
+            nn.Conv3d(self.input_size, 32, (1, 1, 2)),#, stride=(1, 1, 2)), #padding = (0, 0, 2),
             nn.ELU(),
             nn.BatchNorm3d(32, False),
             nn.Dropout(0.25),
@@ -98,6 +112,17 @@ class Model(nn.Module):
         
 
     def forward(self, x):
+        """
+        Parameters
+        -------------
+        x : torch.Tensor
+            *x*  must be of size *(B, 9, 9, F, S)*, being *B* the batch size, *F* the number of features, *S* the number of frequency bands.
+        
+        Returns
+        ----------
+        torch.Tensor
+            A tensor of size *(B, NC)*, being *B* the batch size, and *NC* the number of classes.
+        """
         # Use transpose [B, H, W, F, S] --> [B, F, H, W, S]
         x = x.permute(0, 3, 1, 2, 4)
 

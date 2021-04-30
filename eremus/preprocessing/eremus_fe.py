@@ -1,3 +1,75 @@
+"""
+This module implements some useful functions, in order to extract features from EEG data.
+It is intended to complete the *mne_features* library, looking at different features in accordance to Hong He et al. (2020).
+
+You could use this module, to extract the implemented features, without using *mne_features*, but you can also use the latter.
+
+Examples
+--------------
+>>> # Single feature extraction
+>>> import mne
+>>> import numpy as np
+>>> import pandas as pd
+>>> from random import randint
+>>> from eremus.preprocessing import eremus_fe
+>>> 
+>>> dataset_directory = '..\\EREMUSDataset\\'
+>>> dataset = pd.read_excel(dataset_directory + 'eremus_test.xlsx')
+>>> filename = dataset.iloc[randint(0, len(dataset) - 1)].filename_pruned
+>>> data_directory = '..\\EREMUSDataset\\recordings_pruned_with_ICA\\'
+>>> raw = mne.io.read_raw_eeglab(data_directory + filename, verbose=False)
+>>> np_data = raw.get_data()
+>>> np_data.shape
+(32, 10249)
+>>> eremus_fe.compute_channel_covariance(np_data)
+
+>>> # Use mne_features
+>>> from mne_features.feature_extraction import extract_features
+>>> # Example with continous data
+>>> 
+>>> # Get data from raw
+>>> data = raw.get_data()
+>>> # Get shape of data
+>>> C, T = data.shape
+>>> # Add Epoch dimension
+>>> data = data.reshape(1, C, T)
+>>> 
+>>> # Get Sampling Frequency
+>>> sfreq = raw.info['sfreq']
+>>> 
+>>> # Select custom functions
+>>> selected_funcs = [('covariance', eremus_fe.compute_covariance), 
+>>>                   ('mean_absolute_deviation', eremus_fe.compute_mean_absolute_deviation), 
+>>>                   ('median', eremus_fe.compute_median), 
+>>>                   ('median_absolute_deviation', eremus_fe.compute_median_absolute_deviation), 
+>>>                   ('maximum', eremus_fe.compute_maximum), 
+>>>                   ('minimum', eremus_fe.compute_minimum), 
+>>>                   ('upper_quartile', eremus_fe.compute_upper_quartile), 
+>>>                   ('lower_quartile', eremus_fe.compute_lower_quartile)]
+>>> 
+>>> # Features Maps
+>>> F = len(selected_funcs)
+>>> 
+>>> # Extract features (chan axis concatenation - for continous data)
+>>> features = extract_features(data, sfreq, selected_funcs, return_as_df=False).reshape(F, C)
+>>> features.shape
+(8, 32)
+
+See also
+--------------
+mne_features : https://mne.tools/mne-features/generated/mne_features.feature_extraction.extract_features.html
+
+References
+---------------
+Hong He, Yonghong Tan, Jun Ying, Wuxiong Zhang,
+Strengthen EEG-based emotion recognition using firefly integrated optimization algorithm,
+Applied Soft Computing,
+Volume 94,
+2020,
+106426,
+ISSN 1568-4946,
+https://doi.org/10.1016/j.asoc.2020.106426.
+"""
 from scipy.stats import median_abs_deviation
 
 import mne
@@ -6,7 +78,7 @@ import pandas as pd
 import mne_features
 
 from sklearn import svm
-from eremus_utils import Session
+from eremus.eremus_utils import Session
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import (train_test_split, StratifiedKFold)
 from sklearn.pipeline import Pipeline
@@ -38,12 +110,17 @@ symmetric_electrodes = {
 
 def compute_channel_covariance(data):
     """Covariance of the data (per channel, beetween channels).
+    
     Parameters
     ----------
-    data : shape (n_channels, n_times)
+    data : numpy.ndarray, shape (n_channels, n_times)
+        A array representing EEG data, being *n_channels* the number of EEG channels and *n_times* the number of time-points.
+    
     Returns
     -------
-    output : ndarray, shape (n_channels, n_channels)
+    numpy.ndarray, shape (n_channels, n_channels)
+        The covariance beetween channels.
+    
     Notes
     -----
     Alias of the feature function: **channel_covariance**
@@ -51,14 +128,21 @@ def compute_channel_covariance(data):
     return np.cov(data, ddof=1)
 
 def compute_covariance(data, k=128):
-    """Covariance of the data (per channel, beetween samples at distance k).
+    """Covariance of the data (per channel, beetween samples at distance *k*).
+    
     Parameters
     ----------
-    data : shape (n_channels, n_times)
+    data : numpy.ndarray, shape (n_channels, n_times)
+        A array representing EEG data, being *n_channels* the number of EEG channels and *n_times* the number of time-points.
     k : int
+        distance beetween samples. Default to 128.
+    
     Returns
     -------
-    output : ndarray, shape (n_channels,)
+    numpy.ndarray, shape (n_channels,)
+        The covariance beetween samples at distance *k*.
+    
+    
     Notes
     -----
     Alias of the feature function: **covariance**
@@ -83,12 +167,17 @@ def compute_covariance(data, k=128):
 
 def compute_mean_absolute_deviation(data):
     """Mean absolute deviation of the data (per channel).
+    
     Parameters
     ----------
-    data : shape (n_channels, n_times)
+    data : numpy.ndarray, shape (n_channels, n_times)
+        A array representing EEG data, being *n_channels* the number of EEG channels and *n_times* the number of time-points.
+    
     Returns
     -------
-    output : ndarray, shape (n_channels,)
+    numpy.ndarray, shape (n_channels,)
+        The mean absolute deviation (per channel).
+    
     Notes
     -----
     Alias of the feature function: **mean_absolute_deviation**
@@ -97,12 +186,17 @@ def compute_mean_absolute_deviation(data):
 
 def compute_median(data):
     """Median of the data (per channel).
+    
     Parameters
     ----------
-    data : shape (n_channels, n_times)
+    data : numpy.ndarray, shape (n_channels, n_times)
+        A array representing EEG data, being *n_channels* the number of EEG channels and *n_times* the number of time-points.
+    
     Returns
     -------
-    output : ndarray, shape (n_channels,)
+    numpy.ndarray, shape (n_channels,)
+        The median (per channel).
+    
     Notes
     -----
     Alias of the feature function: **median**
@@ -111,12 +205,17 @@ def compute_median(data):
 
 def compute_median_absolute_deviation(data):
     """Median absolute deviation of the data (per channel).
+    
     Parameters
     ----------
-    data : shape (n_channels, n_times)
+    data : numpy.ndarray, shape (n_channels, n_times)
+        A array representing EEG data, being *n_channels* the number of EEG channels and *n_times* the number of time-points.
+    
     Returns
     -------
-    output : ndarray, shape (n_channels,)
+    numpy.ndarray, shape (n_channels,)
+        The median absolute deviation (per channel).
+    
     Notes
     -----
     Alias of the feature function: **median_absolute_deviation**
@@ -125,12 +224,17 @@ def compute_median_absolute_deviation(data):
 
 def compute_maximum(data):
     """Maximum of the data (per channel).
+    
     Parameters
     ----------
-    data : shape (n_channels, n_times)
+    data : numpy.ndarray, shape (n_channels, n_times)
+        A array representing EEG data, being *n_channels* the number of EEG channels and *n_times* the number of time-points.
+    
     Returns
     -------
-    output : ndarray, shape (n_channels,)
+    numpy.ndarray, shape (n_channels,)
+        The maximum (per channel).
+    
     Notes
     -----
     Alias of the feature function: **maximum**
@@ -139,12 +243,17 @@ def compute_maximum(data):
 
 def compute_minimum(data):
     """Minimum of the data (per channel).
+    
     Parameters
     ----------
-    data : shape (n_channels, n_times)
+    data : numpy.ndarray, shape (n_channels, n_times)
+        A array representing EEG data, being *n_channels* the number of EEG channels and *n_times* the number of time-points.
+    
     Returns
     -------
-    output : ndarray, shape (n_channels,)
+    numpy.ndarray, shape (n_channels,)
+        The minimum (per channel).
+    
     Notes
     -----
     Alias of the feature function: **minimum**
@@ -153,12 +262,17 @@ def compute_minimum(data):
 
 def compute_upper_quartile(data):
     """Upper Quartile of the data (per channel).
+    
     Parameters
     ----------
-    data : shape (n_channels, n_times)
+    data : numpy.ndarray, shape (n_channels, n_times)
+        A array representing EEG data, being *n_channels* the number of EEG channels and *n_times* the number of time-points.
+    
     Returns
     -------
-    output : ndarray, shape (n_channels,)
+    numpy.ndarray, shape (n_channels,)
+        The upper quartile (per channel).
+    
     Notes
     -----
     Alias of the feature function: **upper_quartile**
@@ -167,12 +281,17 @@ def compute_upper_quartile(data):
 
 def compute_lower_quartile(data):
     """Lower Quartile of the data (per channel).
+    
     Parameters
     ----------
-    data : shape (n_channels, n_times)
+    data : numpy.ndarray, shape (n_channels, n_times)
+        A array representing EEG data, being *n_channels* the number of EEG channels and *n_times* the number of time-points.
+    
     Returns
     -------
-    output : ndarray, shape (n_channels,)
+    numpy.ndarray, shape (n_channels,)
+        The lower quartile (per channel).
+    
     Notes
     -----
     Alias of the feature function: **lower_quartile**
@@ -195,14 +314,21 @@ def compute_lower_quartile(data):
 
 def compute_psd(data, sfreq=128, flatten=False):
     """PSD of the data (per channel).
+    
     Parameters
     ----------
-    data : shape (n_channels, n_times)
-    sfreq: int
+    data : numpy.ndarray, shape (n_channels, n_times)
+        A array representing EEG data, being *n_channels* the number of EEG channels and *n_times* the number of time-points.
+    sfreq : int
+        Sampling Frequency in Hz. Default to 128.
+    flatten : bool
+        if True, flatten the output array
+    
     Returns
     -------
-    output : ndarray, shape (n_channels, n_freqs) if flatten is False (default)
-             ndarray, shape (n_channels*n_freqs,) if flatten is True
+    numpy.ndarray 
+        The power spectral density of input data. Its shape is *(n_channels, n_freqs)* if flatten is False (default), then *(n_channels\*n_freqs,)* if flatten is True.
+    
     Notes
     -----
     Alias of the feature function: **psd**
@@ -214,18 +340,30 @@ def compute_psd(data, sfreq=128, flatten=False):
 
 def compute_pow_bands(data, sfreq=128, freq_bands=np.array([0.5, 4.0, 8.0, 13.0, 30.0, 64.0]), flatten=False):
     """Power Bands of the data (per channel).
+    
     Parameters
     ----------
-    data : shape (n_channels, n_times)
-    sfreq: int
-    freq_bands: see compute_pow_freq_bands docs
+    data : numpy.ndarray, shape (n_channels, n_times)
+        A array representing EEG data, being *n_channels* the number of EEG channels and *n_times* the number of time-points.
+    sfreq : int
+        Sampling Frequency in Hz. Default to 128.
+    freq_bands : numpy.ndarray or dict (default: np.array([.5, 4, 8, 13, 30, 64]))
+        Array or dict containing the frequency bands edges. We suggest to not modify it. Otherwise see *mne_features* documentation for further details.
+    flatten : bool
+        if True, flatten the output array
+    
     Returns
     -------
-    output : ndarray, shape (n_channels, n_bands) if flatten is False (default)
-             ndarray, shape (n_channels*n_bands,) if flatten is True
+    numpy.ndarray 
+        The power bands of input data. Its shape is *(n_channels, n_bands)* if flatten is False (default), then *(n_channels\*n_bands,)* if flatten is True. *n_bands* is equal to the shape of *freq_bands*, minus 1.
+    
     Notes
     -----
     Alias of the feature function: **pow_bands**
+    
+    See also
+    ----------
+    compute_pow_freq_bands: https://mne.tools/mne-features/generated/mne_features.univariate.compute_pow_freq_bands.html
     """
     C, _ = data.shape
     if flatten:
@@ -235,23 +373,37 @@ def compute_pow_bands(data, sfreq=128, freq_bands=np.array([0.5, 4.0, 8.0, 13.0,
 
 def compute_differential_pow_bands(data, sfreq=128, freq_bands=np.array([0.5, 4.0, 8.0, 13.0, 30.0, 64.0]), flatten=False, apply_padding=True):
     """Differential Bands Power of the data (per symmetric channels).
+    
     Parameters
     ----------
-    data : shape (n_channels, n_times)
+    data : numpy.ndarray, shape (n_channels, n_times)
+        A array representing EEG data, being *n_channels* the number of EEG channels and *n_times* the number of time-points.
     sfreq : int
-    freq_bands : see compute_pow_freq_bands docs
+        Sampling Frequency in Hz. Default to 128.
+    freq_bands : numpy.ndarray or dict (default: np.array([.5, 4, 8, 13, 30, 64]))
+        Array or dict containing the frequency bands edges. We suggest to not modify it. Otherwise see *mne_features* documentation for further details.
     flatten : bool
+        if True, flatten the output array.
     apply_padding : bool
+        if True, padding is added to the output array
     
     Returns
     -------
-    output : ndarray, shape (n_channels/2, n_bands) if !flatten and apply_padding (default)
-             ndarray, shape (n_channels/2*n_bands,) if flatten and apply_padding
-             ndarray, shape (n_sym, n_bands) if !flatten and !apply_padding 
-             ndarray, shape (n_sym*n_bands,) if flatten and !apply_padding
+    numpy.ndarray 
+        The differential band power. Power bands of symmetric channels are subctracted each other.
+        The output shape depends on *flatten* and *apply_padding* parameters:
+            - shape (n_channels/2, n_bands) if !flatten and apply_padding (default)
+            - shape (n_channels/2*n_bands,) if flatten and apply_padding
+            - shape (n_sym, n_bands) if !flatten and !apply_padding 
+            - shape (n_sym*n_bands,) if flatten and !apply_padding
+    
     Notes
     -----
     Alias of the feature function: **differential_pow_bands**
+    
+    See also
+    ----------
+    compute_pow_freq_bands: https://mne.tools/mne-features/generated/mne_features.univariate.compute_pow_freq_bands.html
     """
     C, _ = data.shape
     B = freq_bands.shape[0] - 1

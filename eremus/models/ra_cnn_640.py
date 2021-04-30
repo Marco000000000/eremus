@@ -8,75 +8,48 @@ import torch.optim
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
+from eremus.utils.ADL import Adl_4d
 from torchvision import transforms, datasets
 import torch.backends.cudnn as cudnn; cudnn.benchmark = True
 import torch; torch.utils.backcompat.broadcast_warning.enabled = True
 
-# ASYMMETRIC DIFFERENTIAL LAYER
-def Adl_2d(x):
-    """
-    Asymmetric Differential Layer (ADL) in 2D.
-    
-    Given a matrix IN of shape [H, W], returns a matrix OUT of shape [H , integer_part(W/2)].
-    OUT(i, j) = IN(i, j) - IN(i, W + 1 - j).
-    In short, The input matrix is folded in half along width dimension, 
-    and the overlapped elements are subtracted beetween them.
-    
-    Params:
-        - x: torch.Tensor, input matrix (size HxW)
-    Returns
-        torch.Tensor, ADL output matrix (size Hx(W/2))
-    """
-    # Given a matri
-    w = x.size(-1)
-    w_2 = int(w/2)
-    sx = x[:, :w_2]
-    dx = x[:, -w_2:]
-    return sx - dx.flip(-1)
-
-def Adl_3d(x):
-    """
-    Asymmetric Differential Layer (ADL) in 3D.
-    
-    Given a matrix IN of shape [F, H, W], returns a matrix OUT of shape [F, H , integer_part(W/2)].
-    OUT(k, i, j) = IN(k, i, j) - IN(k, i, W + 1 - j).
-    In short, The input matrix is folded in half along width dimension, 
-    and the overlapped elements are subtracted beetween them.
-    ADL in 3D is equivalent to perform ADL in 2D F times, one for HxW matrix in input.
-    
-    Params:
-        - x: torch.Tensor, input matrix (size FxHxW)
-    Returns
-        torch.Tensor, ADL output matrix (size FxHx(W/2))
-    """
-    w = x.size(-1)
-    w_2 = int(w/2)
-    sx = x[:, :, :w_2]
-    dx = x[:, :, -w_2:]
-    return sx - dx.flip(-1)
-
-def Adl_4d(x):
-    """
-    Asymmetric Differential Layer (ADL) in 4D.
-    
-    Given a matrix IN of shape [B, F, H, W], returns a matrix OUT of shape [B, F, H , integer_part(W/2)].
-    OUT(b, k, i, j) = IN(b, k, i, j) - IN(b, k, i, W + 1 - j).
-    In short, The input matrix is folded in half along width dimension, 
-    and the overlapped elements are subtracted beetween them.
-    ADL in 4D is equivalent to perform ADL in 3D B times, one for FxHxW matrix in input.
-    
-    Params:
-        - x: torch.Tensor, input matrix (size BxFxHxW)
-    Returns
-        torch.Tensor, ADL output matrix (size BxFxHx(W/2))
-    """
-    w = x.size(-1)
-    w_2 = int(w/2)
-    sx = x[:, :, :, :w_2]
-    dx = x[:, :, :, -w_2:]
-    return sx - dx.flip(-1)
-
 class Model(nn.Module):
+    """
+    It implements the Regional Asymmetric Convolutional Neural Network.
+    Network is adapated for samples of size *(B, 9, 9, T)*, being *B* the batch size, and *T* the number of time-points.
+    This particular implementation accepts only *T* = 640 time-points. If you want to customize the number of *T* you must play
+    with some parameter through convolutional layers, as kernel size and stride. 
+    We suggest to modify the kernel size of the last convolutional layer in Temporal Extractor to fit your *T* size.
+   
+    Arguments
+    -------------
+    args : dict
+        A dictionary containing the following keys:
+        
+        num_channels : int
+            The number of channels. Default to 32.
+        num_classes : int
+            The number of classes. Default to 4.
+        verbose : bool
+            If True, tensors sizes are printed at the end of each extractor
+    
+    See also
+    --------------
+    eremus.models.ra_cnn : a different version of RA-CNN adapted for 1280 time-points
+    eremus.models.spectral_ra_cnn : a different version of RA-CNN adapted for frequency-bands
+    eremus.models.ra_cnn_debug : the same version of RA-CNN with more verbose information
+    
+    References
+    ---------------
+    Heng Cui, Aiping Liu, Xu Zhang, Xiang Chen, Kongqiao Wang, Xun Chen, 
+    EEG-based emotion recognition using an end-to-end regional-asymmetric convolutional neural network,
+    Knowledge-Based Systems,
+    Volume 205,
+    2020,
+    106243,
+    ISSN 0950-7051,
+    https://doi.org/10.1016/j.knosys.2020.106243.
+    """
 
     def __init__(self, args):
         super(Model, self).__init__()
@@ -160,6 +133,17 @@ class Model(nn.Module):
         
 
     def forward(self, x):
+        """
+        Parameters
+        -------------
+        x : torch.Tensor
+            *x*  must be of size *(B, 9, 9, T)*, being *B* the batch size, and *T* the number of time-points.
+        
+        Returns
+        ----------
+        torch.Tensor
+            A tensor of size *(B, NC)*, being *B* the batch size, and *NC* the number of classes.
+        """
         # Add feature dimension [B, H, W, D] --> [B, F, H, W, D]
         x = x.unsqueeze(1)
 

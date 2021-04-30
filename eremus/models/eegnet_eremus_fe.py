@@ -13,7 +13,29 @@ import torch.backends.cudnn as cudnn; cudnn.benchmark = True
 import numpy as np
     
 class Model(nn.Module):
+    """
+    It defines a Convolutional Neural Network, EEGNet, adapted to EREMUS samples with extracted features in frequency-domain.
+    Network is adapated for samples of size *(B, C, F)*, being *B* the batch size, *C* the number of EEG channels, and *F* the number of extracted features.
+    This particular implementation fits only *F* = 32. If you want to customize the number of *F* you must play with some parameters through convolutional layers, as kernel size and stride. 
+    We suggest to modify only the input size of the fully connected layer to fit your *F* size.
 
+    Arguments
+    -------------
+    args : dict
+        A dictionary containing the following keys:
+
+        num_channels : int
+            The number of channels. Default to 32.
+        num_classes : int
+            The number of classes. Default to 4.
+        verbose : bool
+            If True, tensors sizes are printed at the end of each layer.
+    
+    See also
+    --------------
+    eremus.models.eegnet_eremus: a different version of EEGNet adapted for samples in time domain.
+    eremus.models.eegnet_eremus_fe_v2 : a different version of EEGNet adapted for samples in frequency domain.
+    """
     def __init__(self, args):
         super(Model, self).__init__()
         args_defaults=dict(num_channels=182, num_classes=10, verbose=False)
@@ -37,16 +59,27 @@ class Model(nn.Module):
         self.pooling3 = nn.MaxPool2d((2, 4))
         
         # FC Layer
-        # NOTE: This dimension will depend on the number of timestamps per sample in your data.
-        # I have 1266 timepoints. 
+        # NOTE: This dimension will depend on the number of features per sample in your data.
+        # I have 32 features. 
         self.fc1 = nn.Linear(16, self.num_classes)
         
 
     def forward(self, x):
+        """
+        Parameters
+        -------------
+        x : torch.Tensor
+            *x*  must be of size  *(B, C, F)*, being *B* the batch size, *C* the number of EEG channels and *F* the number of extracted features.
+        
+        Returns
+        ----------
+        torch.Tensor
+            A tensor of size *(B, NC)*, being *B* the batch size, and *NC* the number of classes.
+        """
         if self.verbose:
-            print(x.size())
-        x = x.unsqueeze(1)
-        x = x.transpose(2, 3)
+            print(x.size())#Initial size [B, C, F]
+        x = x.unsqueeze(1)#Add additional'features dimension' [B, 1, C, F]
+        x = x.transpose(2, 3)# [B, AF, F, C] AF=1
 
         # Layer 1
         if self.verbose:
@@ -54,7 +87,7 @@ class Model(nn.Module):
         x = F.elu(self.conv1(x))
         x = self.batchnorm1(x)
         x = F.dropout(x, 0.25)
-        x = x.permute(0, 3, 1, 2)
+        x = x.permute(0, 3, 1, 2)# C dimension collides [B, 1, AF, F]
         
         # Layer 2
         if self.verbose:

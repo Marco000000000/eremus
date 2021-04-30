@@ -1,67 +1,92 @@
+"""
+In this module we are focusing on preprocessing steps: normalization and standardization.
+
+Tips
+--------------
+Execute normalization or standardization while in numpy format, before convert to tensors.
+Most of steps used in this impelementation are already avaliable in numpy library and not in torch.
+"""
 import os
 import mne
+import json
 import torch
 import random
 import warnings
 import numpy as np
 import pandas as pd
+from pathlib import Path
 from torchvision import transforms, utils
 from torch.utils.data import DataLoader, Subset, ConcatDataset, random_split
 
-# ## Normalization and Standardization
-# 
-# Tips:
-# execute normalization or standardization while in numpy format, before convert to tensors.
-# Most of steps used in this impelementation are already avaliable in numpy library and not in torch.
+# configure eremus Path
+configuration_path = Path(__file__).parent.parent
+with open(configuration_path / 'configuration.txt') as json_file:
+    configuration = json.load(json_file)
+    path_to_eremus_data = configuration['path_to_eremus_data']
+dataset_file = pd.read_excel(path_to_eremus_data + 'eremus_test.xlsx')
+pruned_eeg_root_dir = path_to_eremus_data + 'recordings_pruned_with_ICA\\'
+preprocessed_eeg_root_dir = path_to_eremus_data + 'preprocessed_data\\'
 
 def z_score_norm(raw_eeg_t, mean=None, std=None):
     """
     Change data distribution to meet standardization constraints (0-mean, 1-std).
     Mean and standard deviation are calculated above all channels, from the single eeg sample (i.e. outputs single mean and std)
     
-    Params:
-        raw_eeg_t - the raw data in torch.Tensor format or in numpy.ndarray format.
-        mean - value used in z-score computation, if None mean is calculated over the input
-        std - value used in z-score computation, if None std is calculated over the input
-    Returns:
-        the standardized data into the input's format
+    Parameters
+    -------------
+    raw_eeg_t : Union[torch.Tensor, numpy.ndarray]
+        The raw data. 
+    mean : float 
+        The mean value used in z-score computation. if None mean is calculated over the input.
+    std : float 
+        The standard deviation value used in z-score computation. if None std is calculated over the input.
+    
+    Returns
+    ------------
+    Union[torch.Tensor, numpy.ndarray]
+        the standardized data into the input's format.
     """
     if (mean is None) != (std is None):
         raise Exception ('Please provide both or neither, mean and std args')
         
     if mean is None and std is None:
-        mean = raw_eeg_t.mean(1)
-        std = raw_eeg_t.std(1)
+        mean = raw_eeg_t.mean()
+        std = raw_eeg_t.std()
 
-    return ((raw_eeg_t.transpose(1, 0) - mean)/std).transpose(1, 0)
+    return ((raw_eeg_t - mean)/std)
 
 def minmax_norm(raw_eeg_t, a, b, minim=None, maxim=None):
     """
     Change data distribution to meet normalization constraints (data in range [a, b]).
     Maximum and minimum values are calculated above all channels, from the single eeg sample (i.e. outputs single max and min)
     
-    Params:
-        raw_eeg_t - the raw data in torch.Tensor format or in numpy.ndarray format.
-        a - min value in the normalized output
-        b - max value in the normalized output
-        minim - value used in minmax computation, if None minimum is calculated over the input
-        maxim - value used in minmax computation, if None maximum is calculated over the input
-    Returns:
-        the normalized data into the input's format
+    Parameters
+    -------------
+    raw_eeg_t : Union[torch.Tensor, numpy.ndarray]
+        The raw data. 
+    a : float
+        The mininum value in the normalized output.
+    b : float
+        The maximum value in the normalized output.
+    minim : float
+        The minim value used in minmax computation. if None minimum is calculated over the input.
+    maxim : float
+        The maximum value used in minmax computation. if None maximum is calculated over the input.
+    
+    Returns
+    ------------
+    Union[torch.Tensor, numpy.ndarray]
+        the normalized data into the input's format.
     """
     if (minim is None) != (maxim is None):
         raise Exception ('Please provide both or neither, minim and maxim args')
         
     if minim is None and maxim is None:
-        if isinstance(raw_eeg_t, np.ndarray):
-            minim = raw_eeg_t.min(1)
-            maxim = raw_eeg_t.max(1)
-        else:
-            minim, _ = raw_eeg_t.min(1)
-            maxim, _ = raw_eeg_t.max(1)
+            minim = raw_eeg_t.min()
+            maxim = raw_eeg_t.max()
     w = b - a
     
-    return (w*(raw_eeg_t.transpose(1, 0) - minim)/(maxim - minim) + a).transpose(1, 0)
+    return (w*(raw_eeg_t - minim)/(maxim - minim) + a)
 
 # Along axes (mean and std for dimensions)
 def channel_z_score_norm(raw_eeg_t, mean=None, std=None):
@@ -69,12 +94,19 @@ def channel_z_score_norm(raw_eeg_t, mean=None, std=None):
     Change data distribution to meet standardization constraints (0-mean, 1-std).
     Mean and standard deviation are calculated for each channel (i.e. outputs multiple means and stds (one for channel))
     
-    Params:
-        raw_eeg_t - the raw data in torch.Tensor format or in numpy.ndarray format.
-        mean - value used in z-score computation, if None mean is calculated over the input
-        std - value used in z-score computation, if None std is calculated over the input
-    Returns:
-        the standardized data into the input's format
+    Parameters
+    -------------
+    raw_eeg_t : Union[torch.Tensor, numpy.ndarray]
+        The raw data. 
+    mean : float 
+        The mean value used in z-score computation. if None mean is calculated over the input.
+    std : float 
+        The standard deviation value used in z-score computation. if None std is calculated over the input.
+    
+    Returns
+    ------------
+    Union[torch.Tensor, numpy.ndarray]
+        the standardized data into the input's format.
     """
     if (mean is None) != (std is None):
         raise Exception ('Please provide both or neither, mean and std args')
@@ -90,14 +122,23 @@ def channel_minmax_norm(raw_eeg_t, a, b, minim=None, maxim=None):
     Change data distribution to meet normalization constraints (data in range [a, b]).
     Maximum and minimum values are calculated for each channel (i.e. outputs multiple maxs and mins (one for channel))
     
-    Params:
-        raw_eeg_t - the raw data in torch.Tensor format or in numpy.ndarray format.
-        a - min value in the normalized output
-        b - max value in the normalized output
-        minim - value used in minmax computation, if None minimum is calculated over the input
-        maxim - value used in minmax computation, if None maximum is calculated over the input
-    Returns:
-        the normalized data into the input's format
+    Parameters
+    -------------
+    raw_eeg_t : Union[torch.Tensor, numpy.ndarray]
+        The raw data. 
+    a : float
+        The mininum value in the normalized output.
+    b : float
+        The maximum value in the normalized output.
+    minim : Union[torch.Tensor, numpy.ndarray]
+        The minim value used in minmax computation. if None minimum is calculated over the input.
+    maxim : Union[torch.Tensor, numpy.ndarray]
+        The maximum value used in minmax computation. if None maximum is calculated over the input.
+    
+    Returns
+    ------------
+    Union[torch.Tensor, numpy.ndarray]
+        the normalized data into the input's format.
     """
     if (minim is None) != (maxim is None):
         raise Exception ('Please provide both or neither, minim and maxim args')
@@ -128,46 +169,50 @@ def channel_minmax_norm(raw_eeg_t, a, b, minim=None, maxim=None):
 # mean of means
 def mean_of_means(means, weights):
     """
-    Given means and lenghts of N not-overlapping subsets of a whole set, compute the mean of the set
+    Given means and lenghts of N not-overlapping subsets of a whole set, compute the mean of the set. Weights are the subsets'lengths.
     
-    Params:
-        - means: a list or a numpy.ndarray of means, one for each subset.
-                 The single mean could be a single value (calculated over the whole subset) 
-                 or a numpy.ndarray (calculated for each channel)
-        - weights: a list or a numpy.ndarray of lenghts, one for each subset.
+    Parameters
+    -----------
+    means : Union[list, numpy.ndarray]
+        The list of means, one for each subset. The single mean could be a single value (calculated over the whole subset) or a numpy.ndarray (a per-channel mean).
+    weights : Union[list, numpy.ndarray]
+        The list of lenghts, one for each subset.
         
-    Returns:
-        - the mean of the whole set (union of subsets).
-          The returned mean could be a single value (calculated over the whole set) 
-          or a numpy.ndarray (calculated for each channel), depending on the shape of means
-        - the sum of the weights (that will be the weight of the set)
+    Returns
+    -----------
+    Union[numpy.float64, numpy.ndarray]
+        The mean of the whole set (union of subsets). The returned mean could be a single value (calculated over the whole set) or a numpy.ndarray (calculated for each channel), depending on the shape of means. 
+    int
+        The sum of the weights (that will be the weight of the set).
     """
+    means = np.array(means)
     if len(means[0].shape)==1:
         # means per channel
         #means = np.array([np.array(t) for t in stats['mean']])
         return np.average(means, 0, weights=np.array(weights)), sum(weights)
     else:
         # one mean value for all channels
-        return np.average(np.array(means), weights=np.array(weights)), sum(weights)
+        return np.average(means, weights=np.array(weights)), sum(weights)
 
 # std of stdts
 def std_of_stds(stds, means, weights):
     """
-    Given stds, means and lenghts of N not-overlapping subsets of a whole set, compute the standard deviation of the set
+    Given stds, means and lenghts of N not-overlapping subsets of a whole set, compute the standard deviation of the set. Weights are the subsets'lengths.
     
-    Params:
-        - stds: a list or a numpy.ndarray of stds, one for each subset.
-                 The single std could be a single value (calculated over the whole subset) 
-                 or a numpy.ndarray (calculated for each channel)
-        - means: a list or a numpy.ndarray of means, one for each subset.
-                 The single mean could be a single value (calculated over the whole subset) 
-                 or a numpy.ndarray (calculated for each channel)
-        - weights: a list or a numpy.ndarray of lenghts, one for each subset.
+    Parameters
+    ------------
+    stds : Union[list, numpy.ndarray]
+        The list of stds, one for each subset. The single mean could be a single value (calculated over the whole subset) or a or a numpy.ndarray (calculated for each channel).
+    means : Union[list, numpy.ndarray]
+        The list of means, one for each subset. The single mean could be a single value (calculated over the whole subset) or a numpy.ndarray (a per-channel mean).
+    weights : Union[list, numpy.ndarray]
+        The list of lenghts, one for each subset.
         
-    Returns:
-        the standard deviation of the whole set (union of subsets).
-        The returned standard deviation could be a single value (calculated over the whole set) 
-        or a numpy.ndarray (calculated for each channel), depending on the shape of stds.
+    Returns
+    -----------
+    Union[numpy.float64, numpy.ndarray]
+        The standard deviation of the whole set (union of subsets).
+        The returned standard deviation could be a single value (calculated over the whole set) or a numpy.ndarray (calculated for each channel), depending on the shape of stds.
     """
     stds = np.array(stds)
     means = np.array(means)
@@ -188,17 +233,18 @@ def std_of_stds(stds, means, weights):
 
 def min_of_mins(mins):
     """
-    Given mins, of N not-overlapping subsets of a whole set, compute the min of the set
+    Given mins, of N not-overlapping subsets of a whole set, compute the min of the set.
     
-    Params:
-        - mins: a list or a numpy.ndarray of mins, one for each subset.
-                 The single min could be a single value (calculated over the whole subset) 
-                 or a numpy.ndarray (calculated for each channel)
+    Parameters
+    ------------
+    mins : Union[list, numpy.ndarray]
+        The list of of mins, one for each subset. The single min could be a single value (calculated over the whole subset) or a numpy.ndarray (calculated for each channel).
       
-    Returns:
-        the minumum of the whole set (union of subsets).
-        The returned minimum could be a single value (calculated over the whole set) 
-        or a numpy.ndarray (calculated for each channel), depending on the shape of mins.
+    Returns
+    -----------
+    Union[numpy.float64, numpy.ndarray]
+        The minumum of the whole set (union of subsets).
+        The returned minimum could be a single value (calculated over the whole set) or a numpy.ndarray (calculated for each channel), depending on the shape of mins.
     """
     mins = np.array(mins)
     if len(mins[0].shape)==1:
@@ -210,17 +256,18 @@ def min_of_mins(mins):
 
 def max_of_maxs(maxs):
     """
-    Given maxs, of N not-overlapping subsets of a whole set, compute the max of the set
+    Given maxs, of N not-overlapping subsets of a whole set, compute the max of the set.
     
-    Params:
-        - maxs: a list or a numpy.ndarray of maxs, one for each subset.
-                 The single max could be a single value (calculated over the whole subset) 
-                 or a numpy.ndarray (calculated for each channel)
+    Parameters
+    ------------
+    maxs : Union[list, numpy.ndarray]
+        The list of maxs, one for each subset. The single max could be a single value (calculated over the whole subset) or a numpy.ndarray (calculated for each channel).
       
-    Returns:
-        the maxumum of the whole set (union of subsets).
-        The returned maximum could be a single value (calculated over the whole set) 
-        or a numpy.ndarray (calculated for each channel), depending on the shape of maxs.
+    Returns
+    -----------
+    Union[numpy.float64, numpy.ndarray]
+        The maximum of the whole set (union of subsets). 
+        The returned maximum could be a single value (calculated over the whole set) or a numpy.ndarray (calculated for each channel), depending on the shape of maxs.
     """
     maxs = np.array(maxs)
     if len(maxs[0].shape)==1:
@@ -238,26 +285,38 @@ def max_of_maxs(maxs):
 #max_of_maxs(stats['max'])
 
 # STATS OVER THE SAMPLE (SONG LEVEL)
-def get_song_stats(song, pruned_eeg_root_dir='eeglab_raws\\', return_ch_stats=True, return_tensor=False, verbose=False):
+def get_song_stats(song, pruned_eeg_root_dir=pruned_eeg_root_dir, return_ch_stats=True, return_tensor=False, verbose=False):
     """
     Given a sample entry of EREMUS dataset, returns the statistics of the given sample.
     
-    Params:
-        - song: pandas.core.series.Series, should be a entry of a dataframe, provided by xlsx file 'eremus_test.xlsx'
-                tips: open eremus_test file with pandas and access the returned dataframe with iloc in order to return pandas.core.series.Series
-        - pruned_eeg_root_dir: eremus raw data directory 
-        - return_ch_stats: bool, if True returns channel statistics, if False returns overall statistics
-        - return_tensor: bool, if True returns statistics as a Tensor, if False returns statistics as numpy.ndarray
-                tips: use always False (default value)
-        - verbose: bool, used for debug.
-                tips: use always False (default value)
-    Returns:
-        - mean,
-        - standard deviation,
-        - minimum,
-        - maxim,
-        - lenght
-        of the given song (sample)  
+    Parameters
+    -------------
+    song : pandas.core.series.Series.
+        It should be a entry of a dataframe, provided by xlsx file *eremus_test.xlsx*.
+        **Tips**: open *eremus_test* file with pandas and access the returned dataframe with iloc in order to return pandas.core.series.Series.
+    pruned_eeg_root_dir : str
+        The eremus raw data directory. 
+    return_ch_stats : bool 
+        If True it returns channel statistics, if False returns overall statistics.
+    return_tensor : bool
+        If True it returns statistics as a Tensor, if False returns statistics as numpy.ndarray. 
+        **Tips**: use always False (default value).
+    verbose : bool
+        If true it prints information for debug.
+        **Tips**: use always False (default value).
+    
+    Returns
+    ---------------
+    Union[numpy.float64, numpy.ndarray, torch.Tensor]
+        mean of the given song (sample). The first four return values are numpy.ndarray by default; they are numpy.float64 when return_ch_stats is False and return_tensor is False; they are torch.Tensor while return_ternsor is True.
+    Union[numpy.float64, numpy.ndarray, torch.Tensor]
+        standard deviation of the given song (sample).
+    Union[numpy.float64, numpy.ndarray, torch.Tensor]
+        minimum of the given song (sample).
+    Union[numpy.float64, numpy.ndarray, torch.Tensor]
+        maximum of the given song (sample).
+    int
+        lenght of the given song (sample).   
     """
     eeg_file = song['filename_pruned']
         
@@ -281,6 +340,9 @@ def get_song_stats(song, pruned_eeg_root_dir='eeglab_raws\\', return_ch_stats=Tr
         std = raw_eeg.std(1)
         minim = raw_eeg.min(1)
         maxim = raw_eeg.max(1)
+        if return_tensor:
+            minim = minim.values
+            maxim = maxim.values
     else:
         mean = raw_eeg.mean()
         std = raw_eeg.std()
@@ -294,28 +356,41 @@ def get_song_stats(song, pruned_eeg_root_dir='eeglab_raws\\', return_ch_stats=Tr
     return mean, std, minim, maxim, l
 
 # STATS OVER THE SUBJECT (using all songs of the same recording)
-def get_subject_stats(eeg_data, sub_id, select_single_session=True, select_other_session=False, return_ch_stats=True, verbose=False):
+def get_subject_stats(eeg_data, sub_id, pruned_eeg_root_dir=pruned_eeg_root_dir, select_single_session=True, select_other_session=False, return_ch_stats=True, verbose=False):
     """
-    Given a dataframe containing all entries, subject_id, session type, 
-    returns the statistics of the given subject for specified session.
+    Given a dataframe containing all entries, subject_id, session type, returns the statistics of the given subject for specified session.
     
-    Params:
-        - eeg_data: pandas.core.frame.DataFrame, should be the dataframe, provided by xlsx file 'eremus_test.xlsx'
-                tips: open eremus_test file with pandas in order to return pandas.core.series.Series
-        - sub_id: int, subject_id to evaluate
-        - select_single_session: bool, if True evaluate OTHER or PERSONAL session, depending on select_other_session, 
-                if False evaluate both OTHER and PERSONAL sessions.
-        - select_other_session: bool, if True evaluate OTHER session, if False evaluate PERSONAL session
-        - return_ch_stats: bool, if True returns channel statistics, if False returns overall statistics
-        - verbose: bool, used for debug.
-                tips: use always False (default value)
-    Returns:
-        - mean,
-        - standard deviation,
-        - minimum,
-        - maxim,
-        - lenght
-        of the given subject (all songs)  
+    Parameters
+    ----------------
+    eeg_data : pandas.core.series.Series.
+        It should be a entry of a dataframe, provided by xlsx file *eremus_test.xlsx*.
+        **Tips**: open *eremus_test* file with pandas and access the returned dataframe with iloc in order to return pandas.core.series.Series.
+    sub_id : int
+        subject_id to evaluate.
+    pruned_eeg_root_dir : str
+        The eremus raw data directory. 
+    select_single_session : bool
+        If True it evaluates OTHER or PERSONAL session, depending on *select_other_sessioné* parameter, otherwise it evaluates both OTHER and PERSONAL sessions.
+    select_other_session : bool
+        If True it evaluates OTHER session, if False it evaluates PERSONAL session.
+    return_ch_stats : bool 
+        If True it returns channel statistics, if False returns overall statistics.
+    verbose : bool
+        If true it prints information for debug.
+        **Tips**: use always False (default value).
+    
+    Returns
+    ---------------
+    Union[numpy.float64, numpy.ndarray]
+        mean of the given subject's songs (all songs). The first four return values are numpy.ndarray by default; they are numpy.float64 when return_ch_stats is False.
+    Union[numpy.float64, numpy.ndarray]
+        standard deviation of the given subject's songs (all songs).
+    Union[numpy.float64, numpy.ndarray]
+        minimum of the given subject's songs (all songs).
+    Union[numpy.float64, numpy.ndarray]
+        maximum of the given subject's songs (all songs).
+    int
+        lenght of the given subject's songs (all songs).
     """
     # select a particular subject
     sub = eeg_data[eeg_data['subject_id'] == sub_id]
@@ -331,7 +406,7 @@ def get_subject_stats(eeg_data, sub_id, select_single_session=True, select_other
         'len': []
     }
     for _, song in sub.iterrows():
-        m, s, mn, mx, l = get_song_stats(song, return_ch_stats=return_ch_stats)
+        m, s, mn, mx, l = get_song_stats(song, pruned_eeg_root_dir=pruned_eeg_root_dir, return_ch_stats=return_ch_stats)
         stats['mean'].append(m)
         stats['std'].append(s)
         stats['min'].append(mn)
@@ -350,24 +425,35 @@ def get_subject_stats(eeg_data, sub_id, select_single_session=True, select_other
     return mean, std, minim, maxim, w
 
 # STATS OVER THE DATASET
-def get_dataset_stats(eeg_data, return_ch_stats=True, verbose=False):
+def get_dataset_stats(eeg_data, pruned_eeg_root_dir=pruned_eeg_root_dir, return_ch_stats=True, verbose=False):
     """
-    Given a dataframe containing all entries, 
-    returns the statistics of the given dataset.
+    Given a dataframe containing all entries, returns the statistics of the given dataset.
+        
+    Parameters
+    ----------------
+    eeg_data : pandas.core.series.Series.
+        It should be a entry of a dataframe, provided by xlsx file *eremus_test.xlsx*.
+        **Tips**: open *eremus_test* file with pandas and access the returned dataframe with iloc in order to return pandas.core.series.Series.
+    pruned_eeg_root_dir : str
+        The eremus raw data directory. 
+    return_ch_stats : bool 
+        If True it returns channel statistics, if False returns overall statistics.
+    verbose : bool
+        If true it prints information for debug.
+        **Tips**: use always False (default value).
     
-    Params:
-        - eeg_data: pandas.core.frame.DataFrame, should be the dataframe, provided by xlsx file 'eremus_test.xlsx'
-                tips: open eremus_test file with pandas in order to return pandas.core.series.Series
-        - return_ch_stats: bool, if True returns channel statistics, if False returns overall statistics
-        - verbose: bool, used for debug.
-                tips: use always False (default value)
-    Returns:
-        - mean,
-        - standard deviation,
-        - minimum,
-        - maxim,
-        - lenght
-        of the given dataset (all songs - both, personal and other, sessions - of all subjects)  
+    Returns
+    ---------------
+    Union[numpy.float64, numpy.ndarray]
+        mean of the given dataset (all songs - both, personal and other, sessions - of all subjects). The first four return values are numpy.ndarray by default; they are numpy.float64 when *return_ch_stats* is False.
+    Union[numpy.float64, numpy.ndarray]
+        standard deviation of the given dataset (all songs - both, personal and other, sessions - of all subjects).
+    Union[numpy.float64, numpy.ndarray]
+        minimum of the given dataset (all songs - both, personal and other, sessions - of all subjects).
+    Union[numpy.float64, numpy.ndarray]
+        maximum of the given dataset (all songs - both, personal and other, sessions - of all subjects).
+    int
+        lenght of the given dataset (all songs - both, personal and other, sessions - of all subjects).
     """
     stats = {
         'mean': [],
@@ -378,14 +464,14 @@ def get_dataset_stats(eeg_data, return_ch_stats=True, verbose=False):
     }
     for subject_id in range(0, eeg_data['subject_id'].max()+1):
         # add personal session stats
-        m, s, mn, mx, l = get_subject_stats(eeg_data, subject_id, select_other_session=False, return_ch_stats=return_ch_stats)
+        m, s, mn, mx, l = get_subject_stats(eeg_data, subject_id, pruned_eeg_root_dir=pruned_eeg_root_dir, select_other_session=False, return_ch_stats=return_ch_stats)
         stats['mean'].append(m)
         stats['std'].append(s)
         stats['min'].append(mn)
         stats['max'].append(mx)
         stats['len'].append(l)
         # add other session stats
-        m, s, mn, mx, l = get_subject_stats(eeg_data, subject_id, select_other_session=True, return_ch_stats=return_ch_stats)
+        m, s, mn, mx, l = get_subject_stats(eeg_data, subject_id, pruned_eeg_root_dir=pruned_eeg_root_dir, select_other_session=True, return_ch_stats=return_ch_stats)
         stats['mean'].append(m)
         stats['std'].append(s)
         stats['min'].append(mn)
@@ -404,33 +490,47 @@ def get_dataset_stats(eeg_data, return_ch_stats=True, verbose=False):
     return mean, std, minim, maxim, w
 
 # STATS OVER A BASELINE (BASELINE LEVEL)
-def get_subject_stats_by_baseline(baselines, subject_id, required_session_type, pruned_eeg_root_dir='eeglab_raws\\', return_ch_stats=True, return_tensor=False, verbose=False):
+def get_subject_stats_by_baseline(baselines, subject_id, required_session_type, pruned_eeg_root_dir=pruned_eeg_root_dir, return_ch_stats=True, return_tensor=False, verbose=False):
     """
     Given a subject id and a session type, returns the baseline statistics of the given subject and for the required session type.
     
-    Params:
-        - baselines: pandas.core.frame.DataFrame, should be a entry of a dataframe, provided by xlsx file 'baselines.xlsx'
-                tips: open baselines file with pandas in order to return pandas.core.frame.DataFrame
-        - subject_id: int, subject_id to evaluate
-        - required_session_type: string ('other' or 'personal'), the subject's specific session to evaluate
-        - pruned_eeg_root_dir: eremus raw data directory 
-        - return_ch_stats: bool, if True returns channel statistics, if False returns overall statistics
-        - return_tensor: bool, if True returns statistics as a Tensor, if False returns statistics as numpy.ndarray
-                tips: use always False (default value)
-        - verbose: bool, used for debug.
-                tips: use always False (default value)
-    Returns:
-        - mean,
-        - standard deviation,
-        - minimum,
-        - maxim,
-        - lenght
-        of the baseline for the given subject and session type  
+    Parameters
+    -----------
+    baselines : pandas.core.series.Series.
+        It should be a entry of a dataframe, provided by xlsx file *baselines.xlsx*.
+        **Tips**: open *baselines* file with pandas and access the returned dataframe with iloc in order to return pandas.core.series.Series.
+    subject_id : int
+        The subject_id to evaluate.
+    required_session_type : string
+        The subject's specific session to evaluate. Only 'other' or 'personal' vaues are allowed.
+    pruned_eeg_root_dir : str
+        The eremus raw data directory. 
+    return_ch_stats : bool 
+    return_tensor : bool
+        If True it returns statistics as a Tensor, if False returns statistics as numpy.ndarray. 
+        **Tips**: use always False (default value).
+    verbose : bool
+        If true it prints information for debug.
+        **Tips**: use always False (default value).
+        
+    Returns
+    ---------------
+    Union[numpy.float64, numpy.ndarray, torch.Tensor]
+        Baseline's mean for the given subject and session type. The first four return values are numpy.ndarray by default; they are numpy.float64 when *return_ch_stats* is False and return_tensor is False; they are torch.Tensor while *return_ternsor* is True.
+    Union[numpy.float64, numpy.ndarray, torch.Tensor]
+        Baseline's standard deviation for the given subject and session type.
+    Union[numpy.float64, numpy.ndarray, torch.Tensor]
+        Baseline's minimum for the given subject and session type.
+    Union[numpy.float64, numpy.ndarray, torch.Tensor]
+        Baseline's maximum for the given subject and session type.
+    int
+        Baseline's lenght for the given subject and session type.   
     """
     # select and extract baselines for subject_id
     subject_baselines = baselines[baselines['sub_id'] == subject_id]
     # select infos (use_other and use_eyes_closed) from required_session
-    assert(required_session_type=='other' or required_session_type=='personal')
+    if not (required_session_type=='other' or required_session_type=='personal'):
+        raise ValueError("Please provide a valid required_session_type: 'other' or 'personal' are allowed.")
     required_baseline = subject_baselines[subject_baselines['rec_type'] == required_session_type]
     use_other = required_baseline['use_other'].bool()
     use_eyes_closed = required_baseline['use_eyes_closed'].bool()
@@ -477,6 +577,9 @@ def get_subject_stats_by_baseline(baselines, subject_id, required_session_type, 
         std = raw_eeg.std(1)
         minim = raw_eeg.min(1)
         maxim = raw_eeg.max(1)
+        if return_tensor:
+            minim = minim.values
+            maxim = maxim.values
     else:
         mean = raw_eeg.mean()
         std = raw_eeg.std()
@@ -491,24 +594,35 @@ def get_subject_stats_by_baseline(baselines, subject_id, required_session_type, 
 
 
 # STATS OVER THE DATASET (using all baselines)
-def get_dataset_stats_by_baseline(baselines, return_ch_stats=True, verbose=False):
+def get_dataset_stats_by_baseline(baselines, pruned_eeg_root_dir=pruned_eeg_root_dir, return_ch_stats=True, verbose=False):
     """
-    Given a dataframe containing all entries (baselines), 
-    returns the statistics of the given dataset.
+    Given a dataframe containing all entries (baselines), returns the statistics of the given dataset.
+        
+    Parameters
+    ----------------
+    baselines : pandas.core.series.Series.
+        It should be a entry of a dataframe, provided by xlsx file *baselines.xlsx*.
+        **Tips**: open *baselines* file with pandas and access the returned dataframe with iloc in order to return pandas.core.series.Series.
+    pruned_eeg_root_dir : str
+        The eremus raw data directory. 
+    return_ch_stats : bool 
+        If True it returns channel statistics, if False returns overall statistics.
+    verbose : bool
+        If true it prints information for debug.
+        **Tips**: use always False (default value).
     
-    Params:
-        - baselines: pandas.core.frame.DataFrame, should be the dataframe, provided by xlsx file 'baselines.xlsx'
-                tips: open baselines file with pandas in order to return pandas.core.series.Series
-        - return_ch_stats: bool, if True returns channel statistics, if False returns overall statistics
-        - verbose: bool, used for debug.
-                tips: use always False (default value)
-    Returns:
-        - mean,
-        - standard deviation,
-        - minimum,
-        - maxim,
-        - lenght
-        of the given dataset (all baselines - of both, personal and other, sessions - of all subjects)  
+    Returns
+    ---------------
+    Union[numpy.float64, numpy.ndarray]
+        mean of the given dataset (all baselines - of both, personal and other, sessions - of all subjects) . The first four return values are numpy.ndarray by default; they are numpy.float64 when *return_ch_stats* is False.
+    Union[numpy.float64, numpy.ndarray]
+        standard deviation of the given dataset (all baselines - of both, personal and other, sessions - of all subjects) .
+    Union[numpy.float64, numpy.ndarray]
+        minimum of the given dataset (all baselines - of both, personal and other, sessions - of all subjects) .
+    Union[numpy.float64, numpy.ndarray]
+        maximum of the given dataset (all baselines - of both, personal and other, sessions - of all subjects) .
+    int
+        lenght of the given dataset (all baselines - of both, personal and other, sessions - of all subjects) .
     """
     stats = {
         'mean': [],
@@ -519,14 +633,14 @@ def get_dataset_stats_by_baseline(baselines, return_ch_stats=True, verbose=False
     }
     for subject_id in range(0, baselines['sub_id'].max()+1):
         # add personal session stats
-        m, s, mn, mx, l = get_subject_stats_by_baseline(baselines, subject_id, 'personal', return_ch_stats=return_ch_stats)
+        m, s, mn, mx, l = get_subject_stats_by_baseline(baselines, subject_id, 'personal', pruned_eeg_root_dir=pruned_eeg_root_dir, return_ch_stats=return_ch_stats)
         stats['mean'].append(m)
         stats['std'].append(s)
         stats['min'].append(mn)
         stats['max'].append(mx)
         stats['len'].append(l)
         # add other session stats
-        m, s, mn, mx, l = get_subject_stats_by_baseline(baselines, subject_id, 'other', return_ch_stats=return_ch_stats)
+        m, s, mn, mx, l = get_subject_stats_by_baseline(baselines, subject_id, 'other', pruned_eeg_root_dir=pruned_eeg_root_dir, return_ch_stats=return_ch_stats)
         stats['mean'].append(m)
         stats['std'].append(s)
         stats['min'].append(mn)
@@ -548,48 +662,50 @@ def get_dataset_stats_by_baseline(baselines, return_ch_stats=True, verbose=False
 # STATS USED WITH EXTRACTED FEATURES (SUBJECT LEVEL)
 #======================================================
 
-def get_fe_stats(sample, root_dir='preprocessed\\de\\', axis=None, return_tensor=False, verbose=False):
+def get_fe_stats(sample, root_dir=preprocessed_eeg_root_dir + 'de\\', axis=None, verbose=False):
     """
     Given a sample entry of EREMUS dataset, returns the statistics of the given sample.
-    
-    Params:
-        - sample: pandas.core.series.Series, should be a entry of a dataframe, provided by xlsx file 'eremus_test.xlsx'
-                tips: open eremus_test file with pandas and access the returned dataframe with iloc in order to return pandas.core.series.Series
-        - root_dir: raw data directory (.npz format)
-        - axis: Union[int, tuple(int, ...)], axis used in statistics computations.
-            Assuming FE data are of shape (C, F, B): 
-                - use None (default value) in order to return a single value.
-                - use 1 in order to return stats over F axis (i.e. stats are per channel, per band)
-                - use (0, 1) in order to return stats over (C, F) axis (i.e. stats are per band)
-            Assuming FE data are of shape (C, F): 
-                - use None (default value) in order to return a single value.
-                - use 1 in order to return stats over F axis (i.e. stats are per channel)
-        - return_tensor: bool, if True returns statistics as a Tensor, if False returns statistics as numpy.ndarray
-                tips: use always False (default value)
-        - verbose: bool, used for debug.
-                tips: use always False (default value)
-    Returns:
-        - mean,
-        - standard deviation,
-        - minimum,
-        - maxim,
-        - lenght
-        of the given sample  
+
+    Parameters
+    ----------------
+    sample : pandas.core.series.Series
+        It should be a entry of a dataframe, provided by xlsx file *eremus_test.xlsx*.
+        **Tips**: open *eremus_test* file with pandas and access the returned dataframe with iloc in order to return pandas.core.series.Series.
+    root_dir : str
+        The eremus raw data directory (.npz format). 
+    axis : Union[int, tuple of int]
+        Axis used in statistics computations. Assuming FE data are of shape *(C, F, B)*, use **None** (default value) in order to return a single value; use **1** in order to return stats over F axis (i.e. stats are per channel, per band); use **(0, 1)** in order to return stats over (C, F) axis (i.e. stats are per band). Assuming FE data are of shape *(C, F)*, use **None** (default value) in order to return a single value; use **1** in order to return stats over F axis (i.e. stats are per channel).
+    return_tensor : bool
+        If True it returns statistics as a Tensor, if False returns statistics as numpy.ndarray. 
+        **Tips**: use always False (default value).
+    verbose : bool
+        If true it prints information for debug.
+        **Tips**: use always False (default value).
+
+    Returns
+    -----------
+    Union[numpy.float64, numpy.ndarray, torch.Tensor]
+        mean of the given song (sample). The first four return values are numpy.ndarray by default; they are numpy.float64 when return_ch_stats is False and return_tensor is False; they are torch.Tensor while return_ternsor is True.
+    Union[numpy.float64, numpy.ndarray, torch.Tensor]
+        standard deviation of the given song (sample).
+    Union[numpy.float64, numpy.ndarray, torch.Tensor]
+        minimum of the given song (sample).
+    Union[numpy.float64, numpy.ndarray, torch.Tensor]
+        maximum of the given song (sample).
+    int
+        lenght of the given song (sample).   
     """
     filename = root_dir + str(sample.name) + '.npz'
         
     # get numpy vector
     data = np.load(filename)['arr_0']
     C, F, B = data.shape #(n_channels, n_features, n_bands)
-
-    if return_tensor:
-        # convert to Tensor 
-        data = torch.Tensor(data)
         
     mean = data.mean(axis = axis) 
     std = data.std(axis = axis) 
     minim = data.min(axis = axis) 
-    maxim = data.max(axis = axis) 
+    maxim = data.max(axis = axis)
+
     if verbose:
         print('mean: ' + str(mean), end='\t')
         print('std: ' + str(std), end='\t')
@@ -597,38 +713,43 @@ def get_fe_stats(sample, root_dir='preprocessed\\de\\', axis=None, return_tensor
         print('maxim: ' + str(maxim))
     return mean, std, minim, maxim, F
 
-def get_fe_subject_stats(eeg_data, sub_id, root_dir='preprocessed\\de\\', select_single_session=True, select_other_session=False, axis=None, verbose=False):
+def get_fe_subject_stats(eeg_data, sub_id, root_dir=preprocessed_eeg_root_dir + 'de\\', select_single_session=True, select_other_session=False, axis=None, verbose=False):
     """
-    Given a dataframe containing all entries, subject_id, session type, 
-    returns the statistics of the given subject for specified session.
+    Given a dataframe containing all entries, subject_id, session type, returns the statistics of the given subject for the specified session.
     
-    Params:
-        - eeg_data: pandas.core.frame.DataFrame, should be the dataframe, provided by xlsx file 'eremus_test.xlsx'
-                tips: open eremus_test file with pandas in order to return pandas.core.series.Series
-        - sub_id: int, subject_id to evaluate
-        - root_dir: raw data directory (.npz format)
-        - select_single_session: bool, if True evaluate OTHER or PERSONAL session, depending on select_other_session, 
-                if False evaluate both OTHER and PERSONAL sessions.
-        - select_other_session: bool, if True evaluate OTHER session, if False evaluate PERSONAL session
-         - axis: Union[int, tuple(int, ...)], axis used in statistics computations.
-            Assuming FE data are of shape (C, F, B): 
-                - use None (default value) in order to return a single value.
-                - use 1 in order to return stats over F axis (i.e. stats are per channel, per band)
-                - use (0, 1) in order to return stats over (C, F) axis (i.e. stats are per band)
-            tips: use None or (0, 1).
-            Assuming FE data are of shape (C, F): 
-                - use None (default value) in order to return a single value.
-                - use 1 in order to return stats over F axis (i.e. stats are per channel)
-        - verbose: bool, used for debug.
-                tips: use always False (default value)
-    Returns:
-        - mean,
-        - standard deviation,
-        - minimum,
-        - maxim,
-        - lenght
-        of the given subject (all songs)  
+    Parameters
+    ------------
+    eeg_data : pandas.core.series.Series.
+        It should be a entry of a dataframe, provided by xlsx file *eremus_test.xlsx*.
+        **Tips**: open *eremus_test* file with pandas and access the returned dataframe with iloc in order to return pandas.core.series.Series.
+    sub_id : int
+        subject_id to evaluate.
+    pruned_eeg_root_dir : str
+        The raw data directory (.npz format)
+    select_single_session : bool
+        If True it evaluates OTHER or PERSONAL session, depending on *select_other_sessioné* parameter, otherwise it evaluates both OTHER and PERSONAL sessions.
+    select_other_session : bool
+        If True it evaluates OTHER session, if False it evaluates PERSONAL session.
+    axis : Union[int, tuple of int]
+        Axis used in statistics computations. Assuming FE data are of shape *(C, F, B)*, use **None** (default value) in order to return a single value; use **1** in order to return stats over F axis (i.e. stats are per channel, per band); use **(0, 1)** in order to return stats over (C, F) axis (i.e. stats are per band). Assuming FE data are of shape *(C, F)*, use **None** (default value) in order to return a single value; use **1** in order to return stats over F axis (i.e. stats are per channel).
+    verbose : bool
+        If true it prints information for debug. **Tips**: use always False (default value).
+    
+    Returns
+    -----------
+    Union[numpy.float64, numpy.ndarray, torch.Tensor]
+        mean of the given subject (all songs). The first four return values are numpy.ndarray by default; they are numpy.float64 when return_ch_stats is False and return_tensor is False; they are torch.Tensor while return_ternsor is True.
+    Union[numpy.float64, numpy.ndarray, torch.Tensor]
+        standard deviation of the given subject (all songs).
+    Union[numpy.float64, numpy.ndarray, torch.Tensor]
+        minimum of the given subject (all songs).
+    Union[numpy.float64, numpy.ndarray, torch.Tensor]
+        maximum of the given subject (all songs).
+    int
+        lenght of the given subject (all songs).   
     """
+    if axis==1:
+        warnings.warn("Please keep attention. If your data are of shape (C, F, B), don't use 1 axis: Not Implemented Yet.")
     # select a particular subject
     sub = eeg_data[eeg_data['subject_id'] == sub_id]
     if select_single_session:
@@ -649,7 +770,7 @@ def get_fe_subject_stats(eeg_data, sub_id, root_dir='preprocessed\\de\\', select
         stats['min'].append(mn)
         stats['max'].append(mx)
         stats['len'].append(l)
-    # calculate stats for the whole recording 
+    # calculate stats for the whole recording
     mean, w = mean_of_means(stats['mean'], stats['len'])
     std = std_of_stds(stats['std'], stats['mean'], stats['len'])
     minim = min_of_mins(stats['min'])
@@ -662,9 +783,9 @@ def get_fe_subject_stats(eeg_data, sub_id, root_dir='preprocessed\\de\\', select
     return mean, std, minim, maxim, w
 
 # Open data using eremus_test file
-xls_file = 'eremus_test.xlsx'
-eeg_data = pd.read_excel(xls_file)
-get_fe_subject_stats(eeg_data, 14, root_dir='preprocessed\\de\\', select_single_session=False) #axis=(0, 1))
+# xls_file = 'eremus_test.xlsx'
+# eeg_data = pd.read_excel(xls_file)
+# get_fe_subject_stats(eeg_data, 14, root_dir='preprocessed\\de\\', select_single_session=False) #axis=(0, 1))
 
 if __name__ == "__main__":
     
