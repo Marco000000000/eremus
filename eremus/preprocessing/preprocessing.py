@@ -747,6 +747,47 @@ def get_fe_subject_stats(eeg_data, sub_id, root_dir=preprocessed_eeg_root_dir + 
         maximum of the given subject (all songs).
     int
         lenght of the given subject (all songs).   
+        
+    Examples
+    --------------
+    >>> import json
+    >>> from pathlib import Path
+    >>> from eremus.preprocessing import preprocessing as pp
+    >>> # configure eremus Path
+    >>> configuration_path = Path(__file__).parent.parent
+    >>> with open(configuration_path / 'configuration.txt') as json_file:
+    ...     configuration = json.load(json_file)
+    ...     path_to_eremus_data = configuration['path_to_eremus_data']
+    >>> dataset_file = pd.read_excel(path_to_eremus_data + 'eremus_test.xlsx')
+    >>> pruned_eeg_root_dir = path_to_eremus_data + 'recordings_pruned_with_ICA\\'
+    >>> preprocessed_eeg_root_dir = path_to_eremus_data + 'preprocessed_data\\'
+    >>> 
+    >>>     stats_all_bands = {
+    ...     'mean': [],
+    ...     'std': [],
+    ...     'min': [],
+    ...     'max': [],
+    ...     'weights': []
+    ... }
+    >>> 
+    >>> stats_per_band = {
+    ...     'mean': [],
+    ...     'std': [],
+    ...     'min': [],
+    ...     'max': [],
+    ...     'weights': []
+    ... }
+    >>> 
+    >>> for sub in range(34):
+    ... 
+    ...     stats = pp.get_fe_subject_stats(samples, sub, root_dir=preprocessed_eeg_root_dir + "de\\", select_single_session=False)
+    ...     for k, v in zip(stats_all_bands.keys(), stats):
+    ...         stats_all_bands[k] = stats_all_bands[k] + [v]
+    ... 
+    ...     stats = pp.get_fe_subject_stats(samples, sub, root_dir=preprocessed_eeg_root_dir + "de\\", select_single_session=False, axis=(0, 1))
+    ...     for k, v in zip(stats_per_band.keys(), stats):
+    ...         stats_per_band[k] = stats_per_band[k] + [v]
+
     """
     if axis==1:
         warnings.warn("Please keep attention. If your data are of shape (C, F, B), don't use 1 axis: Not Implemented Yet.")

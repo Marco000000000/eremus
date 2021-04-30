@@ -9,9 +9,16 @@ def add_net_to_params(net: nn.Module, args: dict, key: str):
 
 def onehot_map(x, levels):
     """
-    Args:
-        x (tensor: Bx1xHxW): input tensor
-        levels (int): quantization levels
+    Parameters
+    --------------
+        x : torch.Tensor, size Bx1xHxW 
+            The input tensor.
+        levels : int 
+            The number of quantization levels.
+    Returns
+    ----------
+    torch.Tensor
+        The one hot map in the input tensor
     """
     # Quantize
     x = (x*levels).long()

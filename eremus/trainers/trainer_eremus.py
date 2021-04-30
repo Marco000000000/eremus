@@ -1,12 +1,12 @@
 from tqdm import tqdm
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
-from torch.utils.data import DataLoader, WeightedRandomSampler
-import eremus.models as models
 import pandas as pd
-from eremus.utils.models import add_net_to_params
+import torch.nn as nn
+import eremus.models as models
+import torch.nn.functional as F
 from eremus.utils.saver import Saver
+from eremus.utils.models import add_net_to_params
+from torch.utils.data import DataLoader, WeightedRandomSampler
 
 # Histogram logging utilities
 hooks = None # initialized each time
@@ -36,11 +36,11 @@ def setup_forward_hooks(net):
 
 # Forward hook to save module output and update module order
 def forward_hook(module, input, output):
-    """
-    Hook to store last output of a module into a module's variable.
-    Used to log output histograms.
-    This function handles tensor outputs and tuple of tensor outputs
-    """
+    #*********************************
+    #Hook to store last output of a module into a module's variable.
+    #Used to log output histograms.
+    #This function handles tensor outputs and tuple of tensor outputs
+    #*****************************
     # Globals
     global hooks, module_name_map, module_calling_order, name_position_map, log_histograms_errors
     # Update calling order
@@ -155,12 +155,73 @@ def norm_01(x):
     return x
 
 class Trainer:
+    """
+    Use this class to train EREMUS Dataset.
+    
+    Arguments
+    -----------
+    args : dict
+        A dictionary containing the following keys:
+        
+        | **Experiment Options**
+        | <*saver*> eremus.utils.saver.Saver : the saver to use in order to keep metrics.
+        | <*log_every*> int : set log frequency in ephocs.
+        | <*plot_every*> int : set plot frequency in ephocs.
+        | <*save_every*> int : set saving frequency in ephocs.
+        | <*log_histograms*> bool : If True, plot histograms every *plot_every* epochs. You shouoldn't use it.
+        | <*tag*> str : give a tag to the experiment.
+        
+        | **Model Options**
+        | <*model*> str : the neural network module (e.g. ra_cnn). Module arguments should be also added to this dictionary. 
+        | <*num_classes*> int : set the number of classes for classification tasks.
+        
+        | **Training Options**
+        | <*resume*> str : the path to a checkpoint directory or *None*.
+        | <*multi_gpu*> bool : if available and True, use multiple GPUs.
+        | <*device*> str : set device to *cpu* or *cuda*.
+        | <*train_labels*> list : pre-load labels and pass them.
+        | <*batch_size*> int : the batch size.
+        | <*workers*> int : set the number of workers for multi-threading trainings.
+        | <*overfit_batch*> bool : if True, set the dataset to a small sample number (single batch per split). 
+        | <*lr*> float : the learning rate.
+        | <*weight_decay*> double : the weight decay.
+        | <*optim*> str : set Ooptimizer to *SGD* or *Adam*.
+        | <*reduce_lr_every*> int : If not None, reduce learning rate every *reduce_lr_every* epochs of *reduce_lr_factor*.
+        | <*reduce_lr_factor*> float : reduce learning rate every *reduce_lr_every* epochs of *reduce_lr_factor*. 
+        | <*epochs*> int : set the number of training ephocs.
+        | <*eval_after*> int : do not use it (set to 0).
+    """
 
     def __init__(self, args):
         # Store args
         self.args = args
 
     def train(self, datasets):
+        """
+        Train the given dataset!
+        
+        Parameters
+        -------------
+        datasets : dict
+            A dictionary containing the following keys:
+            
+            | <*train*> torch.utils.data.Dataset : the train split of Dataset.
+            | <*test*> torch.utils.data.Dataset : the test split of Dataset.
+            | <*val*> torch.utils.data.Dataset : the validation split of Dataset.
+        
+        Returns
+        -------------
+        nn.Module
+            The neural network used in training.
+            
+        dict
+            A dictionary containing the following keys:
+            
+            | <*train*> dict : train loss and accuracy for each epoch.
+            | <*test*> dict: test loss and accuracy for each epoch.
+            | <*val*> dict: train validation and accuracy for each epoch.
+            
+        """
         # Get args
         args = self.args
         saver = args.saver

@@ -104,20 +104,20 @@ def temporal_split(xls_file, w_dir, train_frac=0.7, validation_frac=0.15, test_f
     Given the dataset, the split fractions and the sliding window parameters,
     compute train, test and validation splits, thus producing three xls files.
 
-        Parameters
-        ----------
-        xls_file : str
-        w_dir : str
-        train_frac : float
-        validation_frac : float
-        test_frac : float
-        window_size : int
-        step_size : int
-        s_freq : int
+    Parameters
+    ----------
+    xls_file : str
+    w_dir : str
+    train_frac : float
+    validation_frac : float
+    test_frac : float
+    window_size : int
+    step_size : int
+    s_freq : int
 
-        Returns
-        -------
-        output : tuple, (n_train, n_val, n_test)
+    Returns
+    -------
+    output : tuple, (n_train, n_val, n_test)
     """
     # read original dataset
     samples = pd.read_excel(xls_file)

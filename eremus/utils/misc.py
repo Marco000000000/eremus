@@ -1,8 +1,8 @@
+import os
 import torch
 import numpy as np
-from torchvision.utils import make_grid
 from PIL import Image
-import os
+from torchvision.utils import make_grid
 
 # Enable cudnn benchmark (can be disabled by suppress_random)
 torch.backends.cudnn.benchmark = True

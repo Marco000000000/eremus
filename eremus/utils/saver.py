@@ -10,7 +10,7 @@ try:
     has_cml = True
 except:
     has_cml = False
-from eremus.utils.misc import image_tensor_to_grid
+from .misc import image_tensor_to_grid
 from matplotlib import pyplot as plt
 import sys
 import ast
@@ -29,6 +29,43 @@ import torchvision.transforms.functional as TF
 class Saver(object):
     """
     Saver allows for saving and restore networks.
+    
+    Arguments
+    ------------
+    base_output_dir : pathlib.Path
+        Path to output directory, in which checkpoints and other data will be saved.
+    args : dict
+        A dictionary containing the following keys:
+        
+        | **Experiment Options**
+        | <*cometml_api_key_path*> str : path to the *cometml_api_key.txt* file, with comet APIs key.
+        | <*cometml_workspace*> str : the comet workspace.
+        | <*cometml_project*> str : the comet project (inside the specified workspace).
+        
+        | **Desired Hyperparameters**
+        | <*batch_size*> int : the batch size.
+        | <*trainer*> str : the trainer module to use(e.g. ..//trainers//trainer_eremus).
+        | <*lr*> float : the learning rate.
+        | <*weight_decay*> double : the weight decay.
+        | <*optim*> str : set Ooptimizer to *SGD* or *Adam*.
+        | <*reduce_lr_every*> int : If not None, reduce learning rate every *reduce_lr_every* epochs of *reduce_lr_factor*.
+        | <*reduce_lr_factor*> float : reduce learning rate every *reduce_lr_every* epochs of *reduce_lr_factor*. 
+        | <*momentum*> float : the momentum to use in optimization algorithm
+        | <*epochs*> int : set the number of training ephocs.
+        | <*seed*> int : a integer seed used in random number generation.
+        | <*device*> str : set device to *cpu* or *cuda*.
+        | <*multi_gpu*> bool : if available and True, use multiple GPUs.
+        | <*overfit_batch*> bool : if True, set the dataset to a small sample number (single batch per split). 
+        
+        | **Other Useful Information**
+        | <*dataset*> str : the used dataset. Specify it as *some_random_name/real_dataset_name*.
+        | <*fold*> str : while in k-fold cross validation, specify the fold.
+        | <*model*> str : the neural network module (e.g. ra_cnn). 
+        | <*subject*> int : while in subject training, specify the subject ID.
+    sub_dirs : Union[list, tuple]
+        List of sub-directories to create. Use one sub-dir for split. (e.g. ['train', 'test', 'val'])
+    tag : str
+        A tag associated with the experiment. **Tips**: use a meaningful tag.
     """
     def __init__(
         self, base_output_dir: Path, args: dict,
@@ -95,7 +132,6 @@ class Saver(object):
                 "reduce_lr_every",
                 "reduce_lr_factor",
                 "weight_decay",
-                "activity_reg_lambda",
                 "momentum",
                 "epochs",
                 "seed",
@@ -107,10 +143,7 @@ class Saver(object):
             self.cml.log_parameters(hyperparams)
         # Dumb other additional informations on comet
         other_useful_infos=["dataset",
-            "splitter",
             "fold",
-            "truncate_pad",
-            "fixed_crop",
             "model",
             "subject"
             ]
@@ -133,13 +166,13 @@ class Saver(object):
                 subprocess.run(['git', cmd], stdout=f)
         # Dump model's code on cometml
         if self.cml is not None:
-            with open("models/" + self.args.__dict__["model"] + ".py") as file:
+            with open(os.path.dirname(__file__) + '\\models\\' + self.args.__dict__["model"] + ".py") as file:
                 code_str = file.read()
                 self.cml.set_code(code_str,overwrite=True, filename=self.args.__dict__["model"]+".py")
 
     def save_data(self, data, name: str):
         """
-        Save generic data
+        Save generic data.
         """
         torch.save(data, self.path / f'{name}.pth')
 
@@ -290,8 +323,7 @@ class Saver(object):
     @staticmethod
     def load_state_dict(model_path: Union[str, Path], verbose: bool = True):
         """
-        Load state dict from pre-trained checkpoint. In case a directory is
-          given as `model_path`, the last modified checkpoint is loaded.
+        Load state dict from pre-trained checkpoint. In case a directory is given as `model_path`, the last modified checkpoint is loaded.
         """
         model_path = Path(model_path)
         if not model_path.exists():

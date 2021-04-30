@@ -449,3 +449,157 @@ frequency_domain_features = {
  'svd_fisher_info',
  'teager_kaiser_energy',
  'wavelet_coef_energy'}
+
+def compute_differential_entropy(raw, l, h, window_size=32):
+    """
+    Gets and prints the spreadsheet's header columns
+    
+    Parameters
+    ----------
+    raw: mne.io.RawArray
+        The input raw eeg
+    l: int
+        Low frequency bound, used to filter raw
+    h: int
+        High frequency bound, used to filter raw
+    window_size: int
+        Number of timepoints in a window during DE computation
+
+    Returns
+    -------
+    numpy.ndarray
+        a feature array of shape (C, F)
+        
+    Examples
+    -------------
+    **Compute Differential entropy for a single sample**
+    
+    >>> import numpy as np
+    >>> import pandas as pd
+    >>> from eremus.eremus_utils import get_raw
+    >>> from eremus.preprocessing import eremus_fe
+    >>> 
+    >>> # Load sample and convert to mne
+    >>> sample = dataset.iloc[0]
+    >>>
+    >>> # Get filename
+    >>> raw_fname = data_directory + sample.filename_pruned # Change filename to get different data types
+    >>> raw = get_raw(raw_fname, sample.start_index, sample.end_index)
+    >>>
+    >>> first=True
+    >>> # Filter each band and compute de
+    >>> for (l,h) in [(1,3),(4,7),(8,13),(14,30),(31,50)]:
+    >>>
+    >>>     de_band = eremus_fe.compute_differential_entropy(raw, l, h)
+    >>>
+    >>>     if first==True:
+    >>>         de=de_band
+    >>>         first=False
+    >>>     else:
+    >>>         de=np.concatenate((de,de_band),axis=2)
+    >>> 
+    >>>     # Here differential entropy for a single band is of shape (C, F, 1)
+    >>> # Here differential entropy is of shape (C, F, B)
+    >>> # Save recording
+    >>> recording_out_path = 'your-path-and-filename.npz'
+    >>> np.savez_compressed(recording_out_path, de)
+    
+    **Compute differential entropy with sliding window for all dataset**
+    
+    >>> import os
+    >>> import numpy as np
+    >>> import pandas as pd
+    >>> import mne; mne.set_log_level(False)
+    >>> 
+    >>> # Set Params
+    >>>
+    >>> # Sampling frequency
+    >>> sfreq = 128
+    >>>
+    >>> # Windowing Parameters
+    >>> window_size = 5.0
+    >>> step_size = 1.0
+    >>> overlap_size = window_size - step_size
+    >>> epsilon = 1/sfreq
+    >>>    
+    >>> # Your Path ro EREMUS Dataset
+    >>> path_to_eremus = 'your-path\\'
+    >>>
+    >>> # Create Output Directory
+    >>> # Set write dir
+    >>> output_dir = path_to_eremus + "preprocessed\\de_ws\\" + str(int(window_size)) + '_' + str(int(step_size)) + '\\'
+    >>> # Create output dir
+    >>> os.makedirs(output_dir, exist_ok=True)
+    >>>
+    >>> # Process each recording
+    >>> for i, sample in pd.read_excel(path_to_eremus + 'eremus_test.xlsx').iterrows():
+    >>>
+    >>>     # Load sample and convert to mne
+    >>>
+    >>>     # Get filename
+    >>>     raw_fname = root_dir + sample.filename_pruned
+    >>>     # Get raw object
+    >>>     raw = get_raw(raw_fname, sample.start_index, sample.end_index)
+    >>>
+    >>>     # Create Epochs
+    >>>
+    >>>     # Extract fake events (Window Sliding)
+    >>>     events = mne.make_fixed_length_events(raw, duration=window_size, overlap=overlap_size)
+    >>>     # Extract epochs and get data
+    >>>     epochs = mne.Epochs(raw, events, 1, 0, window_size - epsilon, proj=True,
+    ...                         baseline=None, preload=True, verbose=False)
+    >>>
+    >>>     de_dict = {}
+    >>>     for j, epoch in enumerate(epochs):
+    >>>
+    >>>         # wrap epoch data in a raw object
+    >>>         raw = mne.io.RawArray(epoch, epochs.info, verbose = False)
+    >>>
+    >>>         first=True
+    >>>         # Filter each band and compute de
+    >>>         for (l,h) in [(1,3),(4,7),(8,13),(14,30),(31,50)]:
+    >>>
+    >>>             de_band = compute_differential_entropy(raw, l, h)
+    >>>
+    >>>             if first==True:
+    >>>                 de=de_band
+    >>>                 first=False
+    >>>             else:
+    >>>                 de=np.concatenate((de,de_band),axis=2)
+    >>>
+    >>>             # Here differential entropy for a single band is of shape (C, F, 1)
+    >>>
+    >>>         # Here differential entropy is of shape (C, F, B)
+    >>>         de_dict['arr_'+str(j)] = de
+    >>>
+    >>>     # Save recording
+    >>>     recording_out_path = output_dir + str(i) + '.npz'
+    >>>     args = (v for _, v in de_dict.items())
+    >>>     np.savez_compressed(recording_out_path, *args)
+    """
+    
+    #filter band of interest
+    raw.filter(l, None, method='iir', iir_params={"order":2, "ftype":"butter"})
+    raw.filter(None, h, method='iir', iir_params={"order":2, "ftype":"butter"})
+    
+    # Convert MNE to numpy array
+    band = raw.get_data()
+    _, n_timepoints = band.shape 
+    
+    #Compute DE for windows of window_size time points without overlap
+    start = range(0, n_timepoints, window_size) 
+    
+    for start in range(0, n_timepoints, window_size)[:-1]:
+        # Compute variance
+        var = np.var(band[:, start:start+window_size],axis=1)
+        # DE partial computation
+        de_tmp=np.array([0.5*np.log(2*np.pi*np.e*v) if v!=0 else 0 for v in var])
+        de_tmp=np.expand_dims(de_tmp,axis=1)
+        
+        # Check first iteration
+        if start==0:
+            de_band=de_tmp
+        else:
+            de_band=np.concatenate((de_band,de_tmp),axis=1)
+            
+    return np.expand_dims(de_band,axis=2)

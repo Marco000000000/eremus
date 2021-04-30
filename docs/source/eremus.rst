@@ -7,7 +7,6 @@ Subpackages
 .. toctree::
    :maxdepth: 4
 
-   eremus.hello
    eremus.models
    eremus.preprocessing
    eremus.trainers
@@ -64,34 +63,10 @@ eremus.gew module
    :undoc-members:
    :show-inheritance:
 
-eremus.misc module
-------------------
-
-.. automodule:: eremus.misc
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-eremus.saver module
--------------------
-
-.. automodule:: eremus.saver
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
 eremus.splitter module
 ----------------------
 
 .. automodule:: eremus.splitter
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-eremus.test module
-------------------
-
-.. automodule:: eremus.test
    :members:
    :undoc-members:
    :show-inheritance:
