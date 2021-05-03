@@ -189,7 +189,7 @@ class GEW(NamedTuple):
     A class representig the Geneva Emotion Wheel rating. 
     It is a named tuple, thus you can access the rating by brackets or by dotted notation.
     
-    Fields
+    Arguments
     --------------
     emotion : str
         a string representing the felt emotion in human readble format.
@@ -334,6 +334,7 @@ def gew_to_hldv4(gew_emotion, min_arousal=0):
     Dominance is considered Low in range [5, 15[, High in range [15, 5[
     Valence is considered Low in range [10, 20[, High in range [0, 10[
     VD graph is thus divided into 4 different areas:
+    
         - HDHV (High Dominance, High Valence)
         - LDHV (Low Dominance, High Valence)
         - LDLV (Low Dominance, Low Valence)
@@ -387,6 +388,7 @@ def gew_to_hldv5(gew_emotion, min_arousal=3):
     Dominance is considered Low in range [5, 15[, High in range [15, 5[
     Valence is considered Low in range [10, 20[, High in range [0, 10[
     VD graph is thus divided into 4 different areas:
+    
         - NEUTRAL (Low Intensity Values)
         - HDHV (High Dominance, High Valence)
         - LDHV (Low Dominance, High Valence)

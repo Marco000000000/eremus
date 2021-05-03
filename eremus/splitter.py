@@ -1,15 +1,49 @@
-from .gew import gew_to_hldv4
+from eremus.eremus_utils import select_emotion
+from eremus.gew import gew_to_hldv4
+from pathlib import Path
+from eremus import gew
 import pandas as pd
+import warnings
 import random
 import math
-from . import gew
+import json
 import re
 import os
 
 pd.options.mode.chained_assignment = None  # default='warn'
 
+# configure eremus Path
+configuration_path = Path(__file__).parent
+with open(configuration_path / 'configuration.txt') as json_file:
+    configuration = json.load(json_file)
+    path_to_eremus_data = configuration['path_to_eremus_data'] 
+
 def split(indices, train_frac=0.7, validation_frac=0.15, test_frac=0.15):
+    """
+    Split the given list of indices into three lists, according to the given fractions. Original list is not shuffled.
     
+    Parameters
+    ----------
+    indices : list of int
+        The list of indices of your dataset.
+    train_frac : float
+        The train fraction. It must be a number in [0, 1] range.
+    validation_frac : float
+        The validation fraction. It must be a number in [0, 1] range.
+    test_frac : float
+        The test fraction. It must be a number in [0, 1] range.  
+        
+    Returns
+    ------------
+    list of int
+        The list of train indices.
+    list of int
+        The list of validation indices.
+    list of int
+        The list of test indices.
+    """
+    if (train_frac + validation_frac + test_frac)!=1:
+        raise ValueError("Train, Test and Validation fractions must sum to 1!")
     num_test = int(len(indices)*test_frac)
     num_validation = int(len(indices)*validation_frac)
     num_train = len(indices) - num_test - num_validation
@@ -21,18 +55,43 @@ def split(indices, train_frac=0.7, validation_frac=0.15, test_frac=0.15):
     return train_idx, validation_idx, test_idx
 
 # get original indices
-def get_original_indices(df):
+def __get_original_indices__(df):
     return list(set(list(df.original_index)))
 
-# get indices for specified emotion id
-def select_emotion(labels, emotion_to_delete):    
-    return [i for i, x in enumerate(labels) if x == emotion_to_delete]
+def augmented_split(path_to_augmented_eremus = path_to_eremus_data + 'augmented_eremus.xlsx', path_to_eremus = path_to_eremus_data + 'eremus_test.xlsx', train_frac=0.7, validation_frac=0.15, test_frac=0.15):
+    """
+    Split EREMUS Dataset (augmented with Sliding Window) into train, validation and test sets. Dataset's spreadsheet MUST be produced by `eremus.dataset_creation.sliding_window` function. Samples form augmented dataset are divided through different splits, making sure that time-windows coming from the same *song* are placed in the same split.
+    
+    Parameters
+    ---------------
+    path_to_augmented_eremus : str
+        The path to the file (including the filename) produced by `eremus.dataset_creation.sliding_window` function.
+    path_to_eremus
+        The path to the *eremus_test.xlsx* file (including the filename). **Tips**: set the path in *configuration.txt* file, and leave the defualt value.
+    train_frac : float
+        The train fraction. It must be a number in [0, 1] range.
+    validation_frac : float
+        The validation fraction. It must be a number in [0, 1] range.
+    test_frac : float
+        The test fraction. It must be a number in [0, 1] range.  
 
-def augmented_split(path_to_augmented_eremus, path_to_eremus, train_frac=0.7, validation_frac=0.15, test_frac=0.15):
+    Returns
+    ------------
+    list of int
+        The list of train indices.
+    list of int
+        The list of validation indices.
+    list of int
+        The list of test indices.
+        
+    See also
+    -------------
+    eremus.dataset_creation.sliding_window : A function that applies sliding window to EREMUS thus producing an augmented version of dataset, outputting a .xlsx file (augmented_eremus.xlsx)
+    """
     # open augmented eremus
     augmented_emus = pd.read_excel(path_to_augmented_eremus)
     # fetch indices
-    original_indices = get_original_indices(augmented_emus)
+    original_indices = __get_original_indices__(augmented_emus)
 
     # open eremus
     emus_dataset = pd.read_excel(path_to_eremus)
@@ -60,8 +119,30 @@ def augmented_split(path_to_augmented_eremus, path_to_eremus, train_frac=0.7, va
 
     return train_idx, validation_idx, test_idx
 
-def simple_split(path_to_eremus, train_frac=0.7, validation_frac=0.15, test_frac=0.15):
+def simple_split(path_to_eremus = path_to_eremus_data + 'eremus_test.xlsx', train_frac=0.7, validation_frac=0.15, test_frac=0.15):
+    """
+    Split EREMUS Dataset into train, validation and test sets.
     
+    Parameters
+    ---------------
+    path_to_eremus : str
+        The path to the *eremus_test.xlsx* file (including the filename). **Tips**: set the path in *configuration.txt* file, and leave the defualt value.
+    train_frac : float
+        The train fraction. It must be a number in [0, 1] range.
+    validation_frac : float
+        The validation fraction. It must be a number in [0, 1] range.
+    test_frac : float
+        The test fraction. It must be a number in [0, 1] range.  
+
+    Returns
+    ------------
+    list of int
+        The list of train indices.
+    list of int
+        The list of validation indices.
+    list of int
+        The list of test indices.
+    """
     # list all indices
     emus_dataset = pd.read_excel(path_to_eremus)
     indices = list(range(len(emus_dataset)))
@@ -81,6 +162,29 @@ def simple_split(path_to_eremus, train_frac=0.7, validation_frac=0.15, test_frac
     return split(indices, train_frac=train_frac, validation_frac=validation_frac, test_frac=test_frac)
 
 def get_split_boundaries(a, b, validation_frac, test_frac):
+    """
+    Compute boudaries between train, validation and test splits, for a single sample temporal split.
+    
+    Parameters
+    ---------------
+    a : int 
+        sample start index
+    b : int
+        sample end index
+    validation_frac : float
+        The validation fraction. It must be a number in [0, 1] range.
+    test_frac : float
+        The test fraction. It must be a number in [0, 1] range.  
+
+    Returns
+    ------------
+    dict of str
+        A dictionary in which keys are splits (train, validation, test) and values are tuple of int, indicating split start and end indices.
+        
+    See also
+    ----------
+    temporal_split : split dataset along time axis.
+    """
     # compute segment lenght
     l = b-a
     # compute sub-lenght
@@ -99,25 +203,39 @@ def get_split_boundaries(a, b, validation_frac, test_frac):
     }
     return boundaries
 
-def temporal_split(xls_file, w_dir, train_frac=0.7, validation_frac=0.15, test_frac=0.15, window_size=10, step_size=3, s_freq=128):
+def temporal_split(xls_file=path_to_eremus_data+'eremus_test.xlsx', w_dir=path_to_eremus_data+'temporal-split\\', train_frac=0.7, validation_frac=0.15, test_frac=0.15, window_size=10, step_size=3, s_freq=128):
     """
-    Given the dataset, the split fractions and the sliding window parameters,
-    compute train, test and validation splits, thus producing three xls files.
+    Given the dataset, the split fractions and the sliding window parameters, compute train, test and validation splits, thus producing three xls files. Each sample is divided in three main zones (Train Section, Validation Section, Test Section). Vaildation and Test section position are fixed (at the end of each recording).
+    
+    .. image :: _images/temporal_split.jpg
 
     Parameters
     ----------
     xls_file : str
+        The path to the *eremus_test.xlsx* file (including the filename). **Tips**: set the path in *configuration.txt* file, and leave the defualt value.
     w_dir : str
+        The path to directory where outputs will be placed. Default value of output directory is retrieved from *configuration.txt*. Default 
     train_frac : float
+        The train fraction. It must be a number in [0, 1] range.
     validation_frac : float
+        The validation fraction. It must be a number in [0, 1] range.
     test_frac : float
+        The test fraction. It must be a number in [0, 1] range.
     window_size : int
+        The size (in seconds) of the time-window used in sliding window algorithm. Default value is 10.
     step_size : int
+        The size (in seconds) of the distance between two windows' start points used in sliding window algorithm. Default value is 3.
     s_freq : int
-
+        The sampling frequency used in EEG data in Hz. Default to 128.
+        
     Returns
-    -------
-    output : tuple, (n_train, n_val, n_test)
+    ------------
+    int
+        The number of train samples.
+    int
+        The number of validation samples.
+    int
+        The number of test samples.
     """
     # read original dataset
     samples = pd.read_excel(xls_file)
@@ -173,6 +291,29 @@ def temporal_split(xls_file, w_dir, train_frac=0.7, validation_frac=0.15, test_f
     return tuple([len(df) for _, df in datasets.items()])
 
 def get_rnd_split_boundaries(a, b, validation_frac, test_frac, verbose=False):
+    """
+    Compute boudaries between train, validation and test splits, for a single sample random temporal split.
+    
+    Parameters
+    ---------------
+    a : int 
+        sample start index
+    b : int
+        sample end index
+    test_frac : float
+        The test fraction. It must be a number in [0, 1] range.  
+    verbose : bool
+        If True, print some information for degub.
+
+    Returns
+    ------------
+    dict of str
+        A dictionary in which keys are splits (train1, train2, train3, validation, test) and values are tuple of int, indicating split start and end indices.
+        
+    See also
+    ----------
+    rnd_temporal_split : split dataset along time axis.
+    """
     # compute segment lenght
     l = b-a
     # compute sub-lenght
@@ -210,7 +351,7 @@ def get_rnd_split_boundaries(a, b, validation_frac, test_frac, verbose=False):
     }
     return boundaries
 
-def print_sets_distribution(boundaries):
+def __print_sets_distribution__(boundaries):
     # char lenght
     ch_len = 80
     # extract boundaries
@@ -237,25 +378,39 @@ def print_sets_distribution(boundaries):
     print((b2-a2)*s2, end='')
     print('='*(ch_len-b2))
     
-def rnd_temporal_split(xls_file, w_dir, train_frac=0.7, validation_frac=0.15, test_frac=0.15, window_size=10, step_size=3, s_freq=128):
+def rnd_temporal_split(xls_file=path_to_eremus_data+'eremus_test.xlsx', w_dir=path_to_eremus_data+'temporal-split\\', train_frac=0.7, validation_frac=0.15, test_frac=0.15, window_size=10, step_size=3, s_freq=128):
     """
-    Given the dataset, the split fractions and the sliding window parameters,
-    compute train, test and validation splits, thus producing three xls files.
+    Given the dataset, the split fractions and the sliding window parameters, compute train, test and validation splits, thus producing three xls files. Each sample is divided in three main zones (Train Section, Validation Section, Test Section). Vaildation and Test section positions are random generated, but never overlap.
+    
+    .. image :: _images/rnd_temporal_split.jpg
 
-        Parameters
-        ----------
-        xls_file : str
-        w_dir : str
-        train_frac : float
-        validation_frac : float
-        test_frac : float
-        window_size : int
-        step_size : int
-        s_freq : int
-
-        Returns
-        -------
-        output : tuple, (n_train, n_val, n_test)
+    Parameters
+    ----------
+    xls_file : str
+        The path to the *eremus_test.xlsx* file (including the filename). **Tips**: set the path in *configuration.txt* file, and leave the defualt value.
+    w_dir : str
+        The path to directory where outputs will be placed. Default value of output directory is retrieved from *configuration.txt*. Default 
+    train_frac : float
+        The train fraction. It must be a number in [0, 1] range.
+    validation_frac : float
+        The validation fraction. It must be a number in [0, 1] range.
+    test_frac : float
+        The test fraction. It must be a number in [0, 1] range.
+    window_size : int
+        The size (in seconds) of the time-window used in sliding window algorithm. Default value is 10.
+    step_size : int
+        The size (in seconds) of the distance between two windows' start points used in sliding window algorithm. Default value is 3.
+    s_freq : int
+        The sampling frequency used in EEG data in Hz. Default to 128.
+        
+    Returns
+    ------------
+    int
+        The number of train samples.
+    int
+        The number of validation samples.
+    int
+        The number of test samples.
     """
     # read original dataset
     samples = pd.read_excel(xls_file)
@@ -315,32 +470,37 @@ def rnd_temporal_split(xls_file, w_dir, train_frac=0.7, validation_frac=0.15, te
 
 def de_ws_sample_temporal_split(sample, train_frac=0.7, validation_frac=0.15, test_frac=0.15, window_size=5.0, step_size=1.0, s_freq=128, verbose=False):
     """
-    Get train, test and validation array indices for a single sample: 
-    chosen arrays for each split are granted to come from not inter-split overlapped windows.
-    
+    Get train, test and validation windows' array indices for a single sample: chosen arrays for each split are granted to come from not inter-split overlapped windows. Indices are chosen with DE_WS Temporal Split algorithm.
+
     Parameters
     ----------
     sample: pandas.core.series.Series
-        a dataset row
+        A dataset row. It should be a entry of a dataframe, provided by xlsx file *eremus_test.xlsx*.
+        **Tips**: open *eremus_test* file with pandas and access the returned dataframe with iloc in order to return pandas.core.series.Series.
     train_frac : float
-        train_fraction
+        The train fraction. It must be a number in [0, 1] range.
     validation_frac : float
-        validation_fraction
+        The validation fraction. It must be a number in [0, 1] range.
     test_frac : float
-        test_fraction
-    window_size : float
-        window size used in dataset augmentation (window sliding) in s
-    step_size : float
-        window size used in dataset augmentation (window sliding) in s
+        The test fraction. It must be a number in [0, 1] range.
+    window_size : int
+        The size (in seconds) of the time-window used in sliding window algorithm. Default value is 10.
+    step_size : int
+        The size (in seconds) of the distance between two windows' start points used in sliding window algorithm. Default value is 3.
     s_freq : int
-        sampling frequency
+        The sampling frequency used in EEG data in Hz. Default to 128.
+    verbose : bool
+        If True, print some information for degub.
 
     Returns
     -------
-    dict {split: list (int)}
-        a dict with lists of array indices, to use for train, validation, test sets.
+    dict of str
+        A dictionary in which keys are splits (train, validation, test) and values are lists of array indices, to use for train, validation, test sets.
+        
+    See also
+    ------------
+    de_ws_temporal_split : for futher information on this type of splitting.
     """
-    
     # get sample lenght
     sample_len = sample.end_index - sample.start_index
     # compute number of frames for the sample
@@ -378,26 +538,40 @@ def de_ws_sample_temporal_split(sample, train_frac=0.7, validation_frac=0.15, te
     }
     return array_indices
 
-def de_ws_temporal_split(xls_file, w_dir, train_frac=0.7, validation_frac=0.15, test_frac=0.15, window_size=10, step_size=3, s_freq=128):
+def de_ws_temporal_split(xls_file=path_to_eremus_data+'eremus_test.xlsx', w_dir=path_to_eremus_data+'temporal-split\\', train_frac=0.7, validation_frac=0.15, test_frac=0.15, window_size=10, step_size=3, s_freq=128):
 
     """
-    Given the dataset, the split fractions and the sliding window parameters,
-    compute train, test and validation splits, thus producing three xls files.
+    Given the dataset, the split fractions and the sliding window parameters, compute train, test and validation splits, thus producing three xls files. Each sample is divided in three main zones (Train Section, Validation Section, Test Section). Validation and Test positions are fixed. We assume each sample is also divided into N windows with the sliding window algorithm. Each window has got a window ID. Windows are assigned to split by index. Windows that are sandwiched between two different split zones are discarded.
+    
+    .. image :: _images/de_ws_temporal_split.jpg
 
-        Parameters
-        ----------
-        xls_file : str
-        w_dir : str
-        train_frac : float
-        validation_frac : float
-        test_frac : float
-        window_size : int
-        step_size : int
-        s_freq : int
-
-        Returns
-        -------
-        output : tuple, (n_train, n_val, n_test)
+    Parameters
+    ----------
+    xls_file : str
+        The path to the *eremus_test.xlsx* file (including the filename). **Tips**: set the path in *configuration.txt* file, and leave the defualt value.
+    w_dir : str
+        The path to directory where outputs will be placed. Default value of output directory is retrieved from *configuration.txt*. Default 
+    train_frac : float
+        The train fraction. It must be a number in [0, 1] range.
+    validation_frac : float
+        The validation fraction. It must be a number in [0, 1] range.
+    test_frac : float
+        The test fraction. It must be a number in [0, 1] range.
+    window_size : int
+        The size (in seconds) of the time-window used in sliding window algorithm. Default value is 10.
+    step_size : int
+        The size (in seconds) of the distance between two windows' start points used in sliding window algorithm. Default value is 3.
+    s_freq : int
+        The sampling frequency used in EEG data in Hz. Default to 128.
+        
+    Returns
+    ------------
+    int
+        The number of train samples.
+    int
+        The number of validation samples.
+    int
+        The number of test samples.
     """
     # read original dataset
     samples = pd.read_excel(xls_file)
@@ -460,43 +634,38 @@ def de_ws_temporal_split(xls_file, w_dir, train_frac=0.7, validation_frac=0.15, 
                
     return tuple([len(df) for _, df in datasets.items()])
 
-def is_balanced(xls_file, t=0.2):
-    samples = pd.read_excel(xls_file)
-    del samples['Unnamed: 0']
-    # extract labels
-    labels = [eval(row.gew_1) for _, row in samples.iterrows()]
-    # get class distribution
-    dd = get_data_distribution(labels, 4, gew_to_hldv4)
-    if 1 in dd:
-        print('Warning: only 1 element per class')
-        return False
-    pp = [round(x/sum(dd), 2) for x in dd]
-    return True if (max(pp) - min(pp))<t else False
-
 def de_ws_sample_rnd_temporal_split(sample, validation_frac=0.15, test_frac=0.15, window_size=5.0, step_size=1.0, s_freq=128, verbose=False):
     """
-    Get train, test and validation array indices for a single sample: 
-    chosen arrays for each split are granted to come from not inter-split overlapped windows.
-    
+    Get train, test and validation windows' array indices for a single sample: chosen arrays for each split are granted to come from not inter-split overlapped windows. Indices are chosen with DE_WS Random Temporal Split algorithm.
+
     Parameters
     ----------
     sample: pandas.core.series.Series
-        a dataset row
+        A dataset row. It should be a entry of a dataframe, provided by xlsx file *eremus_test.xlsx*.
+        **Tips**: open *eremus_test* file with pandas and access the returned dataframe with iloc in order to return pandas.core.series.Series.
+    train_frac : float
+        The train fraction. It must be a number in [0, 1] range.
     validation_frac : float
-        validation_fraction
+        The validation fraction. It must be a number in [0, 1] range.
     test_frac : float
-        test_fraction
-    window_size : float
-        window size used in dataset augmentation (window sliding) in s
-    step_size : float
-        window size used in dataset augmentation (window sliding) in s
+        The test fraction. It must be a number in [0, 1] range.
+    window_size : int
+        The size (in seconds) of the time-window used in sliding window algorithm. Default value is 10.
+    step_size : int
+        The size (in seconds) of the distance between two windows' start points used in sliding window algorithm. Default value is 3.
     s_freq : int
-        sampling frequency
+        The sampling frequency used in EEG data in Hz. Default to 128.
+    verbose : bool
+        If True, print some information for degub.
 
     Returns
     -------
-    dict {split: list (int)}
-        a dict with lists of array indices, to use for train, validation, test sets.
+    dict of str
+        A dictionary in which keys are splits (train, validation, test) and values are lists of array indices, to use for train, validation, test sets.
+        
+    See also
+    ------------
+    de_ws_rnd_temporal_split : for futher information on this type of splitting.
     """
     
     # get sample lenght
@@ -535,26 +704,40 @@ def de_ws_sample_rnd_temporal_split(sample, validation_frac=0.15, test_frac=0.15
     }
     return array_indices
 
-def de_ws_rnd_temporal_split(xls_file, w_dir, train_frac=0.7, validation_frac=0.15, test_frac=0.15, window_size=10, step_size=3, s_freq=128, verbose=False):
+def de_ws_rnd_temporal_split(xls_file=path_to_eremus_data+'eremus_test.xlsx', w_dir=path_to_eremus_data+'temporal-split\\', train_frac=0.7, validation_frac=0.15, test_frac=0.15, window_size=10, step_size=3, s_freq=128, verbose=False):
 
     """
-    Given the dataset, the split fractions and the sliding window parameters,
-    compute train, test and validation splits, thus producing three xls files.
+    Given the dataset, the split fractions and the sliding window parameters, compute train, test and validation splits, thus producing three xls files. Each sample is divided in three main zones (Train Section, Validation Section, Test Section). Validation and Test positions are random generated, but never overlap. We assume each sample is also divided into N windows with the sliding window algorithm. Each window has got a window ID. Windows are assigned to split by index. Windows that are sandwiched between two different split zones are discarded.
+    
+    .. image :: _images/de_ws_rnd_temporal_split.jpg
 
-        Parameters
-        ----------
-        xls_file : str
-        w_dir : str
-        train_frac : float
-        validation_frac : float
-        test_frac : float
-        window_size : int
-        step_size : int
-        s_freq : int
-
-        Returns
-        -------
-        output : tuple, (n_train, n_val, n_test)
+    Parameters
+    ----------
+    xls_file : str
+        The path to the *eremus_test.xlsx* file (including the filename). **Tips**: set the path in *configuration.txt* file, and leave the defualt value.
+    w_dir : str
+        The path to directory where outputs will be placed. Default value of output directory is retrieved from *configuration.txt*. Default 
+    train_frac : float
+        The train fraction. It must be a number in [0, 1] range.
+    validation_frac : float
+        The validation fraction. It must be a number in [0, 1] range.
+    test_frac : float
+        The test fraction. It must be a number in [0, 1] range.
+    window_size : int
+        The size (in seconds) of the time-window used in sliding window algorithm. Default value is 10.
+    step_size : int
+        The size (in seconds) of the distance between two windows' start points used in sliding window algorithm. Default value is 3.
+    s_freq : int
+        The sampling frequency used in EEG data in Hz. Default to 128.
+        
+    Returns
+    ------------
+    int
+        The number of train samples.
+    int
+        The number of validation samples.
+    int
+        The number of test samples.
     """
     # read original dataset
     samples = pd.read_excel(xls_file)
@@ -652,30 +835,36 @@ def get_kfold_temporal_split_boundaries(a, b, test_frac, fold=0, verbose=False):
 
 def de_ws_sample_kfold_temporal_split(sample, test_frac=0.15, fold=0, window_size=5.0, step_size=1.0, s_freq=128, verbose=False):
     """
-    Get train, test and validation array indices for a single sample: 
-    chosen arrays for each split are granted to come from not inter-split overlapped windows.
-    
+    Get train, test and validation windows' array indices for a single sample: chosen arrays for each split are granted to come from not inter-split overlapped windows. Indices are chosen with DE_WS k-Fold Split algorithm.
+
     Parameters
     ----------
     sample: pandas.core.series.Series
-        a dataset row
+        A dataset row. It should be a entry of a dataframe, provided by xlsx file *eremus_test.xlsx*.
+        **Tips**: open *eremus_test* file with pandas and access the returned dataframe with iloc in order to return pandas.core.series.Series.
     test_frac : float
-        test_fraction
+        The test fraction. It must be a number in [0, 1] range. We assume validation fraction is equal to the test one.
     fold : int
-        the fold to use in current split
-    window_size : float
-        window size used in dataset augmentation (window sliding) in s
-    step_size : float
-        window size used in dataset augmentation (window sliding) in s
+        the fold to use in current split.
+    window_size : int
+        The size (in seconds) of the time-window used in sliding window algorithm. Default value is 10.
+    step_size : int
+        The size (in seconds) of the distance between two windows' start points used in sliding window algorithm. Default value is 3.
     s_freq : int
-        sampling frequency
+        The sampling frequency used in EEG data in Hz. Default to 128.
+    verbose : bool
+        If True, print some information for degub.
 
     Returns
     -------
-    dict {split: list (int)}
-        a dict with lists of array indices, to use for train, validation, test sets.
+    dict of str
+        A dictionary in which keys are splits (train, validation, test) and values are lists of array indices, to use for train, validation, test sets.
+        
+    See also
+    ------------
+    de_ws_kfold_temporal_split : for futher information on this type of splitting.
     """
-    
+   
     # get sample lenght
     sample_len = sample.end_index - sample.start_index
     # compute number of frames for the sample
@@ -717,25 +906,37 @@ def de_ws_sample_kfold_temporal_split(sample, test_frac=0.15, fold=0, window_siz
     }
     return array_indices
 
-def de_ws_kfold_temporal_split(xls_file, w_dir, test_frac=0.15, fold=0, window_size=10, step_size=3, s_freq=128, verbose=False):
-
+def de_ws_kfold_temporal_split(xls_file, w_dir=path_to_eremus_data+'temporal-split\\', test_frac=0.15, fold=0, window_size=10, step_size=3, s_freq=128, verbose=False):
     """
-    Given the dataset, the split fractions and the sliding window parameters,
-    compute train, test and validation splits, thus producing three xls files.
+    Given the dataset, the split fractions and the sliding window parameters, compute train, test and validation splits, thus producing three xls files. Each sample is divided in three main zones (Train Section, Validation Section, Test Section). Validation and Test positions are fixed, but they depend on the *fold* paramater. We assume each sample is also divided into N windows with the sliding window algorithm. Each window has got a window ID. Windows are assigned to split by index. Windows that are sandwiched between two different split zones are discarded.
+    
+    .. image :: _images/de_ws_kfold_temporal_split.jpg
 
-        Parameters
-        ----------
-        xls_file : str
-        w_dir : str
-        test_frac : float
-        fold : int
-        window_size : int
-        step_size : int
-        s_freq : int
-
-        Returns
-        -------
-        output : tuple, (n_train, n_val, n_test)
+    Parameters
+    ----------
+    xls_file : str
+        The path to the *eremus_test.xlsx* file (including the filename). **Tips**: set the path in *configuration.txt* file, and leave the defualt value.
+    w_dir : str
+        The path to directory where outputs will be placed. Default value of output directory is retrieved from *configuration.txt*.
+    test_frac : float
+        The test fraction. It must be a number in [0, 1] range. We assume the validation fraction is equal to the test one.
+    fold : int
+        the fold to use in current split.
+    window_size : int
+        The size (in seconds) of the time-window used in sliding window algorithm. Default value is 10.
+    step_size : int
+        The size (in seconds) of the distance between two windows' start points used in sliding window algorithm. Default value is 3.
+    s_freq : int
+        The sampling frequency used in EEG data in Hz. Default to 128.
+        
+    Returns
+    ------------
+    int
+        The number of train samples.
+    int
+        The number of validation samples.
+    int
+        The number of test samples.
     """
     # read original dataset
     samples = pd.read_excel(xls_file)
@@ -801,20 +1002,41 @@ def de_ws_kfold_temporal_split(xls_file, w_dir, test_frac=0.15, fold=0, window_s
 def de_ws_simple_split(xls_file, w_dir, window_size=10, step_size=3, s_freq=128):
 
     """
-    Given the dataset and the sliding window parameters,
-    compute train, test and validation splits, thus producing three xls files.
-
-        Parameters
-        ----------
-        xls_file : str
-        w_dir : str
-        window_size : int
-        step_size : int
-        s_freq : int
-
-        Returns
-        -------
-        output : tuple, (n_train, n_val, n_test)
+    Given the dataset and the sliding window parameters, compute train, test and validation splits, thus producing three xls files.
+    We assume, we have preprocessed data with Sliding Window and Differential Entropy. Each sample in *xls_file* has a *.npz* file with N arrays, one per time window. DE_WS Simple Split Algorithm is built to meet training constraints with small datasets (e.g. single subject trainings). In this approach:
+    
+    - We compute HLDV4 labels for each sample (we are assuming 4 classes classification);
+    - We extract from the small dataset 1 sample per class.
+    - We divide the chosen samples into two halves: the first is used for validation and the latter for test.
+    - All remaining samples are used for train.
+    - We now assume each sample is divided into N windows with the sliding window algorithm. Each window has got a window ID. Windows are assigned to split by index. Windows that are sandwiched between two different split zones are discarded (i.e. in case of validation/test).
+        
+    Parameters
+    ----------
+    xls_file : str
+        The path to the dataset spreadsheet (including the filename). Use a selection of *eremus_test.xlsx*, as a single subject selection. This task is performed by eremus.dataset_creation.create_single_subject_datasets.
+    w_dir : str
+        The path to directory where outputs will be placed.
+    window_size : int
+        The size (in seconds) of the time-window used in sliding window algorithm. Default value is 10.
+    step_size : int
+        The size (in seconds) of the distance between two windows' start points used in sliding window algorithm. Default value is 3.
+    s_freq : int
+        The sampling frequency used in EEG data in Hz. Default to 128.
+        
+    Returns
+    ------------
+    int
+        The number of train samples.
+    int
+        The number of validation samples.
+    int
+        The number of test samples.
+        
+    See also
+    ------------
+    eremus.dataset_creation.create_single_subject_datasets : generate all single subject datasets.
+    eremus.dataset_creation.get_subject_dataset : further deatils on how to generate a particular single subject dataset.
     """
     # read original dataset
     samples = pd.read_excel(xls_file)
@@ -906,3 +1128,33 @@ def de_ws_simple_split(xls_file, w_dir, window_size=10, step_size=3, s_freq=128)
         
                
     return tuple([len(df) for _, df in datasets.items()])
+
+def is_balanced(xls_file, t=0.2):
+    """
+    Determine if a dataset is class balanced. It's using HLDV4 model. This is built to meet training constraints with small datasets (e.g. single subject trainings). In this context a dataset is considered to be balanced if:
+    
+    - it contains more than 1 sample per class.
+    - differential percentage beetween the maximum and the minimum class fractions is less than *t*.
+    
+    Parameters
+    ----------
+    xls_file : str
+        The path to the dataset spreadsheet (including the filename). Use a selection of *eremus_test.xlsx*, as a single subject selection. This task is performed by eremus.dataset_creation.create_single_subject_datasets.
+    t : float
+        Minimum differential percentage beetween the maximum and the minimum class fractions to consider the dataset unbalanced. 
+    Returns
+    ------------
+    bool
+        True, if dataset is balanced. False otherwise.
+    """
+    samples = pd.read_excel(xls_file)
+    del samples['Unnamed: 0']
+    # extract labels
+    labels = [eval(row.gew_1) for _, row in samples.iterrows()]
+    # get class distribution
+    dd = get_data_distribution(labels, 4, gew_to_hldv4)
+    if 1 in dd:
+        warnings.warn('Warning: only 1 element per class')
+        return False
+    pp = [round(x/sum(dd), 2) for x in dd]
+    return True if (max(pp) - min(pp))<t else False

@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 
 class Session(object):
     """
-    A class that describe a listening session, during EREMUS data acquisition
+    A class that describes a listening session, during EREMUS data acquisition.
     
     Arguments
     ---------------
@@ -175,7 +175,7 @@ def getSessions(root_dir, file_ext='edf'):
     """
     Alias of *getRecordings*.
         
-    See
+    See also
     -----------
     getRecordings : alias for getSessions
 
@@ -275,7 +275,7 @@ def get_dataset_labels(data, select_second_label=False):
         Emotion Identifier
     """
     if select_second_label:
-        return [eval(row.gew_2)[0] if(type(row.gew_2)==str) else None for _, row in ds.iterrows()]
+        return [eval(row.gew_2)[0] if(type(row.gew_2)==str) else None for _, row in data.iterrows()]
     return [eval(row.gew_1)[0] for _, row in data.iterrows()]
 
 def select_emotion(labels, emotion_to_select):

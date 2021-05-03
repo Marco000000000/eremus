@@ -47,6 +47,14 @@ eremus.EremusDataset\_WS module
    :undoc-members:
    :show-inheritance:
 
+eremus.dataset\_creation module
+-------------------------------
+
+.. automodule:: eremus.dataset_creation
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 eremus.eremus\_utils module
 ---------------------------
 
