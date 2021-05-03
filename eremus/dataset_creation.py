@@ -112,6 +112,6 @@ def create_single_subject_datasets(xls_file=dataset_file, w_dir=path_to_eremus_d
     os.makedirs(w_dir, exist_ok=True)
     for subject_id in range(pd.read_excel(xls_file).subject_id.max() + 1):
         # Get Sub-Dataset for a Single subject
-        df = get_subject_dataset(xls_file, subject_id, delete_neutral=True, delete_different=True)
+        df = get_subject_dataset(subject_id, xls_file, delete_neutral=True, delete_different=True)
         file_name = w_dir + 'subject_' + str(subject_id) + '.xlsx' 
         df.to_excel(file_name)

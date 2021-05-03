@@ -42,7 +42,7 @@ def split(indices, train_frac=0.7, validation_frac=0.15, test_frac=0.15):
     list of int
         The list of test indices.
     """
-    if (train_frac + validation_frac + test_frac)!=1:
+    if abs((1-(train_frac + validation_frac + test_frac)))>1e-15:
         raise ValueError("Train, Test and Validation fractions must sum to 1!")
     num_test = int(len(indices)*test_frac)
     num_validation = int(len(indices)*validation_frac)
@@ -88,6 +88,8 @@ def augmented_split(path_to_augmented_eremus = path_to_eremus_data + 'augmented_
     -------------
     eremus.dataset_creation.sliding_window : A function that applies sliding window to EREMUS thus producing an augmented version of dataset, outputting a .xlsx file (augmented_eremus.xlsx)
     """
+    if abs((1-(train_frac + validation_frac + test_frac)))>1e-15:
+        raise ValueError("Train, Test and Validation fractions must sum to 1!")
     # open augmented eremus
     augmented_emus = pd.read_excel(path_to_augmented_eremus)
     # fetch indices
@@ -143,6 +145,8 @@ def simple_split(path_to_eremus = path_to_eremus_data + 'eremus_test.xlsx', trai
     list of int
         The list of test indices.
     """
+    if abs((1-(train_frac + validation_frac + test_frac)))>1e-15:
+        raise ValueError("Train, Test and Validation fractions must sum to 1!")
     # list all indices
     emus_dataset = pd.read_excel(path_to_eremus)
     indices = list(range(len(emus_dataset)))
@@ -185,6 +189,10 @@ def get_split_boundaries(a, b, validation_frac, test_frac):
     ----------
     temporal_split : split dataset along time axis.
     """
+    if (validation_frac + test_frac)>1 or validation_frac<0 or test_frac<0:
+        raise ValueError("Test and Validation fractions must be in [0, 1] range and must not to overcome 1, while summed!")
+    if a>=b:
+        raise ValueError("a must be less than b.")
     # compute segment lenght
     l = b-a
     # compute sub-lenght
@@ -205,7 +213,7 @@ def get_split_boundaries(a, b, validation_frac, test_frac):
 
 def temporal_split(xls_file=path_to_eremus_data+'eremus_test.xlsx', w_dir=path_to_eremus_data+'temporal-split\\', train_frac=0.7, validation_frac=0.15, test_frac=0.15, window_size=10, step_size=3, s_freq=128):
     """
-    Given the dataset, the split fractions and the sliding window parameters, compute train, test and validation splits, thus producing three xls files. Each sample is divided in three main zones (Train Section, Validation Section, Test Section). Vaildation and Test section position are fixed (at the end of each recording).
+    Given the dataset, the split fractions and the sliding window parameters, compute train, test and validation splits, thus producing three xls files. Each sample is divided in three main zones (Train Section, Validation Section, Test Section). Validation and Test section position are fixed (at the end of each recording). Then Sliding Window is applied to each section separately, thus augmenting orignal dataset.
     
     .. image :: _images/temporal_split.jpg
 
@@ -237,6 +245,8 @@ def temporal_split(xls_file=path_to_eremus_data+'eremus_test.xlsx', w_dir=path_t
     int
         The number of test samples.
     """
+    if abs((1-(train_frac + validation_frac + test_frac)))>1e-15:
+        raise ValueError("Train, Test and Validation fractions must sum to 1!")
     # read original dataset
     samples = pd.read_excel(xls_file)
     # delete additional column
@@ -283,6 +293,7 @@ def temporal_split(xls_file=path_to_eremus_data+'eremus_test.xlsx', w_dir=path_t
                 # add sample to dataframe
                 datasets[split] = datasets[split].append(sample)
     
+    os.makedirs(w_dir, exist_ok=True)
     # reset indices and write into files
     for split, df in datasets.items():
         df.reset_index(drop=True, inplace=True)
@@ -314,6 +325,10 @@ def get_rnd_split_boundaries(a, b, validation_frac, test_frac, verbose=False):
     ----------
     rnd_temporal_split : split dataset along time axis.
     """
+    if (validation_frac + test_frac)>1 or validation_frac<0 or test_frac<0:
+        raise ValueError("Test and Validation fractions must be in [0, 1] range and must not to overcome 1, while summed!")
+    if a>=b:
+        raise ValueError("a must be less than b.")
     # compute segment lenght
     l = b-a
     # compute sub-lenght
@@ -380,7 +395,7 @@ def __print_sets_distribution__(boundaries):
     
 def rnd_temporal_split(xls_file=path_to_eremus_data+'eremus_test.xlsx', w_dir=path_to_eremus_data+'temporal-split\\', train_frac=0.7, validation_frac=0.15, test_frac=0.15, window_size=10, step_size=3, s_freq=128):
     """
-    Given the dataset, the split fractions and the sliding window parameters, compute train, test and validation splits, thus producing three xls files. Each sample is divided in three main zones (Train Section, Validation Section, Test Section). Vaildation and Test section positions are random generated, but never overlap.
+    Given the dataset, the split fractions and the sliding window parameters, compute train, test and validation splits, thus producing three xls files. Each sample is divided in three main zones (Train Section, Validation Section, Test Section). Validation and Test section positions are random generated, but never overlap. Then Sliding Window is applied to each section separately, thus augmenting orignal dataset.
     
     .. image :: _images/rnd_temporal_split.jpg
 
@@ -412,6 +427,8 @@ def rnd_temporal_split(xls_file=path_to_eremus_data+'eremus_test.xlsx', w_dir=pa
     int
         The number of test samples.
     """
+    if abs((1-(train_frac + validation_frac + test_frac)))>1e-15:
+        raise ValueError("Train, Test and Validation fractions must sum to 1!")
     # read original dataset
     samples = pd.read_excel(xls_file)
     # delete additional column
@@ -475,8 +492,7 @@ def de_ws_sample_temporal_split(sample, train_frac=0.7, validation_frac=0.15, te
     Parameters
     ----------
     sample: pandas.core.series.Series
-        A dataset row. It should be a entry of a dataframe, provided by xlsx file *eremus_test.xlsx*.
-        **Tips**: open *eremus_test* file with pandas and access the returned dataframe with iloc in order to return pandas.core.series.Series.
+        A dataset row. It should be a entry of a dataframe, provided by xlsx file *eremus_test.xlsx* or a selection (e.g. single-subject dataset). **Tips**: open *eremus_test* file (or its selection) with pandas and access the returned dataframe with iloc in order to return pandas.core.series.Series.
     train_frac : float
         The train fraction. It must be a number in [0, 1] range.
     validation_frac : float
@@ -501,6 +517,8 @@ def de_ws_sample_temporal_split(sample, train_frac=0.7, validation_frac=0.15, te
     ------------
     de_ws_temporal_split : for futher information on this type of splitting.
     """
+    if abs((1-(train_frac + validation_frac + test_frac)))>1e-15:
+        raise ValueError("Train, Test and Validation fractions must sum to 1!")
     # get sample lenght
     sample_len = sample.end_index - sample.start_index
     # compute number of frames for the sample
@@ -548,9 +566,9 @@ def de_ws_temporal_split(xls_file=path_to_eremus_data+'eremus_test.xlsx', w_dir=
     Parameters
     ----------
     xls_file : str
-        The path to the *eremus_test.xlsx* file (including the filename). **Tips**: set the path in *configuration.txt* file, and leave the defualt value.
+        The path to the *eremus_test.xlsx* file (including the filename) or a selection (e.g. single-subject dataset). **Tips**: set the path in *configuration.txt* file, and leave the defualt value in order to use *eremus_test.xlsx*, use eremus.dataset_creation.create_single_subject_datasets, to create single subject dataset instead.
     w_dir : str
-        The path to directory where outputs will be placed. Default value of output directory is retrieved from *configuration.txt*. Default 
+        The path to directory where outputs will be placed. Default value of output directory is retrieved from *configuration.txt*.
     train_frac : float
         The train fraction. It must be a number in [0, 1] range.
     validation_frac : float
@@ -573,11 +591,15 @@ def de_ws_temporal_split(xls_file=path_to_eremus_data+'eremus_test.xlsx', w_dir=
     int
         The number of test samples.
     """
+    if abs((1-(train_frac + validation_frac + test_frac)))>1e-15:
+        raise ValueError("Train, Test and Validation fractions must sum to 1!")
     # read original dataset
     samples = pd.read_excel(xls_file)
     # delete additional columns
     del samples['Unnamed: 0']
-
+    # check if file is original or a selection (selections SHOULD always contain original_index column)
+    is_a_selection = 'original_index' in samples.columns
+    
     # get a sample
     sample = samples.iloc[0]
 
@@ -618,8 +640,9 @@ def de_ws_temporal_split(xls_file=path_to_eremus_data+'eremus_test.xlsx', w_dir=
             for array_index in split_indices:
                 # add array_index
                 sample.loc['array_index'] = array_index
-                # add original index
-                #sample.loc['original_index'] = sample.original_index
+                # add original index (if not present in orginal file)
+                if not is_a_selection:
+                    sample.loc['original_index'] = i
                 # add sample to dataframe
                 datasets[split] = datasets[split].append(sample)
     
@@ -634,15 +657,14 @@ def de_ws_temporal_split(xls_file=path_to_eremus_data+'eremus_test.xlsx', w_dir=
                
     return tuple([len(df) for _, df in datasets.items()])
 
-def de_ws_sample_rnd_temporal_split(sample, validation_frac=0.15, test_frac=0.15, window_size=5.0, step_size=1.0, s_freq=128, verbose=False):
+def de_ws_sample_rnd_temporal_split(sample, train_frac=0.7, validation_frac=0.15, test_frac=0.15, window_size=5.0, step_size=1.0, s_freq=128, verbose=False):
     """
     Get train, test and validation windows' array indices for a single sample: chosen arrays for each split are granted to come from not inter-split overlapped windows. Indices are chosen with DE_WS Random Temporal Split algorithm.
 
     Parameters
     ----------
     sample: pandas.core.series.Series
-        A dataset row. It should be a entry of a dataframe, provided by xlsx file *eremus_test.xlsx*.
-        **Tips**: open *eremus_test* file with pandas and access the returned dataframe with iloc in order to return pandas.core.series.Series.
+        A dataset row. It should be a entry of a dataframe, provided by xlsx file *eremus_test.xlsx* or a selection (e.g. single-subject dataset). **Tips**: open *eremus_test* file (or its selection) with pandas and access the returned dataframe with iloc in order to return pandas.core.series.Series.
     train_frac : float
         The train fraction. It must be a number in [0, 1] range.
     validation_frac : float
@@ -667,7 +689,8 @@ def de_ws_sample_rnd_temporal_split(sample, validation_frac=0.15, test_frac=0.15
     ------------
     de_ws_rnd_temporal_split : for futher information on this type of splitting.
     """
-    
+    if abs((1-(train_frac + validation_frac + test_frac)))>1e-15:
+        raise ValueError("Train, Test and Validation fractions must sum to 1!")
     # get sample lenght
     sample_len = sample.end_index - sample.start_index
     # compute number of frames for the sample
@@ -714,9 +737,9 @@ def de_ws_rnd_temporal_split(xls_file=path_to_eremus_data+'eremus_test.xlsx', w_
     Parameters
     ----------
     xls_file : str
-        The path to the *eremus_test.xlsx* file (including the filename). **Tips**: set the path in *configuration.txt* file, and leave the defualt value.
+    The path to the *eremus_test.xlsx* file (including the filename) or a selection (e.g. single-subject dataset). **Tips**: set the path in *configuration.txt* file, and leave the defualt value in order to use *eremus_test.xlsx*, use eremus.dataset_creation.create_single_subject_datasets, to create single subject dataset instead.
     w_dir : str
-        The path to directory where outputs will be placed. Default value of output directory is retrieved from *configuration.txt*. Default 
+        The path to directory where outputs will be placed. Default value of output directory is retrieved from *configuration.txt*. 
     train_frac : float
         The train fraction. It must be a number in [0, 1] range.
     validation_frac : float
@@ -739,11 +762,15 @@ def de_ws_rnd_temporal_split(xls_file=path_to_eremus_data+'eremus_test.xlsx', w_
     int
         The number of test samples.
     """
+    if abs((1-(train_frac + validation_frac + test_frac)))>1e-15:
+        raise ValueError("Train, Test and Validation fractions must sum to 1!")
     # read original dataset
     samples = pd.read_excel(xls_file)
     # delete additional columns
     del samples['Unnamed: 0']
-
+    # check if file is original or a selection (selections SHOULD always contain original_index column)
+    is_a_selection = 'original_index' in samples.columns
+    
     # get a sample
     sample = samples.iloc[0]
 
@@ -772,6 +799,7 @@ def de_ws_rnd_temporal_split(xls_file=path_to_eremus_data+'eremus_test.xlsx', w_
             continue
         # split sample into train, validation and test
         array_indices = de_ws_sample_rnd_temporal_split(sample,
+                                                    train_frac=train_frac,
                                                     validation_frac=validation_frac, 
                                                     test_frac=test_frac, 
                                                     window_size=window_size, 
@@ -784,8 +812,9 @@ def de_ws_rnd_temporal_split(xls_file=path_to_eremus_data+'eremus_test.xlsx', w_
             for array_index in split_indices:
                 # add array_index
                 sample.loc['array_index'] = array_index
-                # add original index
-                #sample.loc['original_index'] = sample.original_index
+                # add original index (if not present in orginal file)
+                if not is_a_selection:
+                    sample.loc['original_index'] = i
                 # add sample to dataframe
                 datasets[split] = datasets[split].append(sample)
     
@@ -801,6 +830,36 @@ def de_ws_rnd_temporal_split(xls_file=path_to_eremus_data+'eremus_test.xlsx', w_
     return tuple([len(df) for _, df in datasets.items()])
 
 def get_kfold_temporal_split_boundaries(a, b, test_frac, fold=0, verbose=False):
+    """
+    Compute boudaries between train, validation and test splits, for a single sample k-fold temporal split.
+    
+    Parameters
+    ---------------
+    a : int 
+        sample start index
+    b : int
+        sample end index
+    test_frac : float
+        The test fraction. It must be a number in [0, 1] range.  
+    fold : int
+        the fold to use in current split.
+    verbose : bool
+        If True, print some information for degub.
+
+    Returns
+    ------------
+    dict of str
+        A dictionary in which keys are splits (validation, test) and values are tuple of int, indicating split start and end indices.
+        
+    See also
+    ----------
+    rnd_temporal_split : split dataset along time axis.
+    """
+    if (2*test_frac)>1 or test_frac<0:
+        raise ValueError("Test and Validation fractions must be in [0, 1] range and must not to overcome 1, while summed! Remember we are assuming validation fraction is equal to the test fraction.")
+    max_fold = int(1/test_frac) - 1
+    if fold<0 or fold>max_fold:
+        raise ValueError("Fold must be in [0-"+str(max_fold)+"] range.")
     # we assume validation_frac = test_frac
     # compute segment lenght
     real_l = b-a
@@ -808,8 +867,7 @@ def get_kfold_temporal_split_boundaries(a, b, test_frac, fold=0, verbose=False):
     l_test = int(real_l*test_frac)
     l_validation = l_test
     # compute number of folds with the given fractions
-    folds = int(1//test_frac)
-    assert fold<folds and fold>=0, "Please insert a valid value for fold. 0-"+folds-1+" values are accepted."
+    folds = int(1/test_frac)
     # compute used length
     l = l_test*folds
     l_train = l - l_test - l_validation
@@ -840,8 +898,7 @@ def de_ws_sample_kfold_temporal_split(sample, test_frac=0.15, fold=0, window_siz
     Parameters
     ----------
     sample: pandas.core.series.Series
-        A dataset row. It should be a entry of a dataframe, provided by xlsx file *eremus_test.xlsx*.
-        **Tips**: open *eremus_test* file with pandas and access the returned dataframe with iloc in order to return pandas.core.series.Series.
+        A dataset row. It should be a entry of a dataframe, provided by xlsx file *eremus_test.xlsx* or a selection (e.g. single-subject dataset). **Tips**: open *eremus_test* file (or its selection) with pandas and access the returned dataframe with iloc in order to return pandas.core.series.Series.
     test_frac : float
         The test fraction. It must be a number in [0, 1] range. We assume validation fraction is equal to the test one.
     fold : int
@@ -864,7 +921,11 @@ def de_ws_sample_kfold_temporal_split(sample, test_frac=0.15, fold=0, window_siz
     ------------
     de_ws_kfold_temporal_split : for futher information on this type of splitting.
     """
-   
+    if (2*test_frac)>1 or test_frac<0:
+        raise ValueError("Test and Validation fractions must be in [0, 1] range and must not to overcome 1, while summed! Remember we are assuming validation fraction is equal to the test fraction.")
+    max_fold = int(1/test_frac) - 1
+    if fold<0 or fold>max_fold:
+        raise ValueError("Fold must be in [0-"+str(max_fold)+"] range.") 
     # get sample lenght
     sample_len = sample.end_index - sample.start_index
     # compute number of frames for the sample
@@ -906,7 +967,7 @@ def de_ws_sample_kfold_temporal_split(sample, test_frac=0.15, fold=0, window_siz
     }
     return array_indices
 
-def de_ws_kfold_temporal_split(xls_file, w_dir=path_to_eremus_data+'temporal-split\\', test_frac=0.15, fold=0, window_size=10, step_size=3, s_freq=128, verbose=False):
+def de_ws_kfold_temporal_split(xls_file=path_to_eremus_data+'eremus_test.xlsx', w_dir=path_to_eremus_data+'temporal-split\\', test_frac=0.15, fold=0, window_size=10, step_size=3, s_freq=128, verbose=False):
     """
     Given the dataset, the split fractions and the sliding window parameters, compute train, test and validation splits, thus producing three xls files. Each sample is divided in three main zones (Train Section, Validation Section, Test Section). Validation and Test positions are fixed, but they depend on the *fold* paramater. We assume each sample is also divided into N windows with the sliding window algorithm. Each window has got a window ID. Windows are assigned to split by index. Windows that are sandwiched between two different split zones are discarded.
     
@@ -915,7 +976,7 @@ def de_ws_kfold_temporal_split(xls_file, w_dir=path_to_eremus_data+'temporal-spl
     Parameters
     ----------
     xls_file : str
-        The path to the *eremus_test.xlsx* file (including the filename). **Tips**: set the path in *configuration.txt* file, and leave the defualt value.
+        The path to the *eremus_test.xlsx* file (including the filename) or a selection (e.g. single-subject dataset). **Tips**: set the path in *configuration.txt* file, and leave the defualt value in order to use *eremus_test.xlsx*, use eremus.dataset_creation.create_single_subject_datasets, to create single subject dataset instead.
     w_dir : str
         The path to directory where outputs will be placed. Default value of output directory is retrieved from *configuration.txt*.
     test_frac : float
@@ -938,11 +999,18 @@ def de_ws_kfold_temporal_split(xls_file, w_dir=path_to_eremus_data+'temporal-spl
     int
         The number of test samples.
     """
+    if (2*test_frac)>1 or test_frac<0:
+        raise ValueError("Test and Validation fractions must be in [0, 1] range and must not to overcome 1, while summed! Remember we are assuming validation fraction is equal to the test fraction.")
+    max_fold = int(1/test_frac) - 1
+    if fold<0 or fold>max_fold:
+        raise ValueError("Fold must be in [0-"+str(max_fold)+"] range.")
     # read original dataset
     samples = pd.read_excel(xls_file)
     # delete additional columns
     del samples['Unnamed: 0']
-
+    # check if file is original or a selection (selections SHOULD always contain original_index column)
+    is_a_selection = 'original_index' in samples.columns
+    
     # get a sample
     sample = samples.iloc[0]
 
@@ -983,8 +1051,9 @@ def de_ws_kfold_temporal_split(xls_file, w_dir=path_to_eremus_data+'temporal-spl
             for array_index in split_indices:
                 # add array_index
                 sample.loc['array_index'] = array_index
-                # add original index
-                #sample.loc['original_index'] = sample.original_index
+                # add original index (if not present in orginal file)
+                if not is_a_selection:
+                    sample.loc['original_index'] = i
                 # add sample to dataframe
                 datasets[split] = datasets[split].append(sample)
     
@@ -1152,7 +1221,7 @@ def is_balanced(xls_file, t=0.2):
     # extract labels
     labels = [eval(row.gew_1) for _, row in samples.iterrows()]
     # get class distribution
-    dd = get_data_distribution(labels, 4, gew_to_hldv4)
+    dd = gew.get_data_distribution(labels, 4, gew_to_hldv4)
     if 1 in dd:
         warnings.warn('Warning: only 1 element per class')
         return False
