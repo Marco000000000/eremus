@@ -1,28 +1,50 @@
 import mne
 import math
-import json
 import torch
 import warnings
 import numpy as np
 import pandas as pd
-from math import isnan
-from torchvision import transforms, utils
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset
 
 class EremusDataset_WS(Dataset):
-    """Music-evoked emotions dataset."""
+    """A dataset for Emotion Recognition using EEG data and MUsical Stimuli. When using this dataset class with a Sequential Sampler, access samples by shifting a time-window at each loading. A single counter is associated with the whole dataset. Then, you can see sliding window only when you have accessed ALL the samples. When the time window reaches the end for a sample, it resets to start for that sample. This is True only using a Sequential Sampler. It implements the sliding window single counter algorithm.
+    
+    Parameters
+    ------------------
+    xls_file : str
+        Path to the xls file with samples annotations.
+    eeg_root_dir : str
+        Directory with all the eeg data.
+    data_type : int 
+        It describes the type of data to load:
+        
+        - EremusDataset.DATA_RAW (0) - data in *eeg_root_dir* are raw edf files; 
+        - EremusDataset.DATA_PRUNED (1) - data in *eeg_root_dir* are pruned set files;
+        - EremusDataset.DATA_PREPROCESSED (2) - data in *eeg_root_dir* are preprocessed npz files.
+    windows_size : int
+        The width of the time-window to use when accessing data. window size is expressed in number of sample (i.e. number of seconds * sampling frequency).
+    step_size : int
+        The number of sample (i.e. number of seconds * sampling frequency) with wich time-window is shifted through epoching.
+    indices : list of int
+        Indices of xls_file to use in the current dataset. If None all samples are used.
+    transform : callable 
+        Optional transform to be applied on a sample.
+    select_data : boolean
+        If data_type != EremusDataset.DATA_PREPROCESSED and select_data = True, only channel data are selected, without metadata of Raw objects. Note that sample is a tuple of array: also time array is extracted. Do not use this attribute while using transforms.
+    label_transform  : callable 
+        Conversion function to be applied on a label.
+    **args
+        args to be passed to *label_transform*
+    """
+    
     DATA_RAW = 0
+    """It describes raw edf data type."""
     DATA_PRUNED = 1
+    """It describes set data type. EEG are filtered and pruned with ICA."""
     DATA_PREPROCESSED = 2
+    """It describes npz data type. EEG are preprocessed through various techniques."""
 
     def __init__(self, xls_file, eeg_root_dir, data_type: int = DATA_RAW, window_size = 1280, step_size = 128*3, indices=None, transform=None, select_data=False, label_transform=None, **args):
-        """
-        Args:
-            xls_file (string): Path to the xls file with annotations.
-            root_dir (string): Directory with all the images.
-            transform (callable, optional): Optional transform to be applied
-                on a sample.
-        """
     
         self.eeg_data = pd.read_excel(xls_file)
         self.eeg_root_dir = eeg_root_dir
@@ -105,19 +127,45 @@ class EremusDataset_WS(Dataset):
         return sample
     
 class EremusDataset_WS_MultipleCounters(Dataset):
-    """Music-evoked emotions dataset."""
+    """A dataset for Emotion Recognition using EEG data and MUsical Stimuli. When using this dataset class, we access samples by shifting a time-window at each sample loading. A counter is associated with each sample. Then you can see sliding window just with two consecutives accesses of the same sample. When the time window reaches the end for a sample, it resets to start for that sample. It implements the sliding window multiple counters algorithm.
+    
+    Parameters
+    ------------------
+    xls_file : str
+        Path to the xls file with samples annotations.
+    eeg_root_dir : str
+        Directory with all the eeg data.
+    data_type : int 
+        It describes the type of data to load:
+        
+        - EremusDataset.DATA_RAW (0) - data in *eeg_root_dir* are raw edf files; 
+        - EremusDataset.DATA_PRUNED (1) - data in *eeg_root_dir* are pruned set files;
+        - EremusDataset.DATA_PREPROCESSED (2) - data in *eeg_root_dir* are preprocessed npz files.
+    windows_size : int
+        The width of the time-window to use when accessing data. window size is expressed in number of sample (i.e. number of seconds * sampling frequency).
+    step_size : int
+        The number of sample (i.e. number of seconds * sampling frequency) with wich time-window is shifted through epoching.
+    indices : list of int
+        Indices of xls_file to use in the current dataset. If None all samples are used.
+    transform : callable 
+        Optional transform to be applied on a sample.
+    select_data : boolean
+        If data_type != EremusDataset.DATA_PREPROCESSED and select_data = True, only channel data are selected, without metadata of Raw objects. Note that sample is a tuple of array: also time array is extracted. Do not use this attribute while using transforms.
+    label_transform  : callable 
+        Conversion function to be applied on a label.
+    **args
+        args to be passed to *label_transform*
+    """
+    
     DATA_RAW = 0
+    """It describes raw edf data type."""
     DATA_PRUNED = 1
+    """It describes set data type. EEG are filtered and pruned with ICA."""
     DATA_PREPROCESSED = 2
+    """It describes npz data type. EEG are preprocessed through various techniques."""
+
 
     def __init__(self, xls_file, eeg_root_dir, data_type: int = DATA_RAW, window_size = 1280, step_size = 128*3, indices=None, transform=None, select_data=False, label_transform=None, **args):
-        """
-        Args:
-            xls_file (string): Path to the xls file with annotations.
-            root_dir (string): Directory with all the images.
-            transform (callable, optional): Optional transform to be applied
-                on a sample.
-        """
     
         self.eeg_data = pd.read_excel(xls_file)
         self.eeg_root_dir = eeg_root_dir
@@ -133,6 +181,8 @@ class EremusDataset_WS_MultipleCounters(Dataset):
         self.counters = None
         if self.indices is not None:
             self.counters = list(np.zeros(len(self.indices), dtype=np.int))
+        else: 
+            self.counters = list(np.zeros(len(self.eeg_data), dtype=np.int))
         
     def __len__(self):
         if self.indices is not None:
@@ -150,7 +200,7 @@ class EremusDataset_WS_MultipleCounters(Dataset):
             count = self.counters[idx]
         else: 
             real_idx = idx
-            count = 0
+            count = self.counters[idx]
         
         # get start and stop samples
         start = self.eeg_data.iloc[real_idx]['start_index']
@@ -206,178 +256,12 @@ class EremusDataset_WS_MultipleCounters(Dataset):
 
         return sample
 
-class FixedCrop(object):
-    """Crop the eeg in a sample from given start point.
-
-    Args:
-        output_size (int): Desired output size.
-    """
-
-    def __init__(self, output_size, start=0):
-        assert isinstance(output_size, int)
-        assert isinstance(start, int)
-        if isinstance(output_size, int):
-            self.output_size = output_size 
-        if isinstance(start, int):
-            self.start = start
-
-    def __call__(self, sample):
-        eeg, emotion= sample['eeg'], sample['emotion']
-        
-        # Check eeg instance type
-        is_eeg_numpy = isinstance(eeg, np.ndarray)
-
-        d = eeg.shape[1] if is_eeg_numpy else eeg[:][0].shape[1] 
-        new_d = self.output_size
-        assert (self.start + self.output_size)<d, "start + output_size exceeds the sample length"
-
-        start = self.start
-        stop = start + self.output_size
-
-        eeg = eeg[:, start:stop] if is_eeg_numpy else eeg.crop(tmin=eeg.times[start], tmax=eeg.times[stop],  include_tmax=False)
-        
-        return {'eeg': eeg, 'emotion': emotion}
-    
-class RandomCrop(object):
-    """Crop randomly the eeg in a sample.
-
-    Args:
-        output_size (int): Desired output size.
-    """
-
-    def __init__(self, output_size):
-        assert isinstance(output_size, int)
-        if isinstance(output_size, int):
-            self.output_size = output_size
-
-    def __call__(self, sample):
-        eeg, emotion= sample['eeg'], sample['emotion']
-
-        # Check eeg instance type
-        is_eeg_numpy = isinstance(eeg, np.ndarray)
-
-        d = eeg.shape[1] if is_eeg_numpy else eeg[:][0].shape[1]
-        new_d = self.output_size
-
-        start = np.random.randint(0, d - new_d)
-        stop = start + self.output_size
-
-        eeg = eeg[:, start:stop] if is_eeg_numpy else eeg.crop(tmin=eeg.times[start], tmax=eeg.times[stop],  include_tmax=False)
-        
-        return {'eeg': eeg, 'emotion': emotion}
-    
-class ToArray(object):
-    """Convert eeg in sample to ndarray."""
-
-    def __call__(self, sample):
-        eeg, emotion= sample['eeg'], sample['emotion']
-        # discard times, select only array data
-        eeg = eeg[:][0]
-        return {'eeg': eeg, 'emotion': emotion}
-    
-class ToMatrix(object):
-    """Convert eeg in sample to ndarray (matrix version)."""
-    
-    def __init__(self):
-        self.location = {
-            'Cz': (4, 4),
-            'Fz': (2, 4),
-            'Fp1': (0, 3),
-            'F7': (2, 0),
-            'F3': (2, 2),
-            'FC1': (3, 3),
-            'C3': (4, 2),
-            'FC5': (3, 1),
-            'FT9': (3, 0),
-            'T7': (4, 0),
-            'CP5': (5, 1),
-            'CP1': (5, 3),
-            'P3': (6, 2),
-            'P7': (6, 0),
-            'PO9': (7, 0),
-            'O1': (8, 3),
-            'Pz': (6, 4),
-            'Oz': (8, 4),
-            'O2': (8, 5),
-            'PO10': (7, 8),
-            'P8': (6, 8),
-            'P4': (6, 6),
-            'CP2': (5, 5),
-            'CP6': (5, 7),
-            'T8': (4, 8),
-            'FT10': (3, 8),
-            'FC6': (3, 7),
-            'C4': (4, 6),
-            'FC2': (3, 5),
-            'F4': (2, 6),
-            'F8': (2, 8),
-            'Fp2': (0, 5)
-        }
-        
-        self.ndlocation = {i: loc for i, (_, loc) in enumerate(self.location.items())}
-
-    def __call__(self, sample):
-        eeg, emotion= sample['eeg'], sample['emotion']
-        
-        # Check eeg instance type
-        if isinstance(eeg, np.ndarray):
-            
-            # Eeg is a np.ndarray
-            # Create an empty matrix (filled with 0)
-            eeg_matrix = np.zeros((9, 9, eeg[:][0].shape[0]))
-            # Encode array elements in matrix
-            for chan, coords in self.ndlocation.items():
-                eeg_matrix[coords][:] = eeg[chan]
-        else:
-            
-            # Eeg is a Raw object
-            # Create an empty matrix (filled with 0)
-            eeg_matrix = np.zeros((9, 9, eeg[:][0].shape[1]))
-            # Encode elements in matrix
-            for chan, coords in self.location.items():
-                eeg_matrix[coords][:] = eeg[chan][0].reshape(-1)
-
-        return {'eeg': eeg_matrix, 'emotion': emotion}
-
-class ToTensor(object):
-    """Convert ndarrays in sample to Tensors."""
-    
-    def __init__(self, interface='dict', eeg_tensor_type = 'float32', label_interface='tensor'):
-        self.interfaces = ['dict', 'unpacked_values']
-        self.eeg_tensor_types = ['float64', 'float32']
-        self.label_interfaces = ['tensor', 'long']
-        
-        assert isinstance(interface, str)
-        if isinstance(interface, str) and interface in self.interfaces:
-            self.interface = interface
-            
-        assert isinstance(eeg_tensor_type, str)
-        if isinstance(eeg_tensor_type, str) and eeg_tensor_type in self.eeg_tensor_types:
-            self.eeg_tensor_type = eeg_tensor_type
-        
-        assert isinstance(label_interface, str)
-        if isinstance(label_interface, str) and label_interface in self.label_interfaces:
-            self.label_interface = label_interface
-
-    def __call__(self, sample):
-        eeg, emotion= sample['eeg'], sample['emotion']
-        
-        if self.eeg_tensor_type=='float32':
-            eeg = eeg.astype(np.float32)
-        eeg = torch.from_numpy(eeg)
-            
-        if self.label_interface=='tensor':
-            emotion = torch.LongTensor([emotion])
-        
-        if self.interface=='dict':
-            return {'eeg': eeg, 'emotion': emotion}
-        elif self.interface=='unpacked_values':
-            return eeg, emotion
-
 if __name__ == "__main__":
     
     import splitter
     from gew import gew_to_hldv4
+    from torchvision import transforms
+    from eeg_transforms import *
 
     # split dataset into train, validation and test
     train_idx, validation_idx, test_idx = splitter.simple_split('eremus_test.xlsx', 

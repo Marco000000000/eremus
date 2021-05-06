@@ -392,6 +392,7 @@ def compute_differential_pow_bands(data, sfreq=128, freq_bands=np.array([0.5, 4.
     numpy.ndarray 
         The differential band power. Power bands of symmetric channels are subctracted each other.
         The output shape depends on *flatten* and *apply_padding* parameters:
+        
             - shape (n_channels/2, n_bands) if !flatten and apply_padding (default)
             - shape (n_channels/2*n_bands,) if flatten and apply_padding
             - shape (n_sym, n_bands) if !flatten and !apply_padding 

@@ -55,10 +55,26 @@ eremus.dataset\_creation module
    :undoc-members:
    :show-inheritance:
 
+eremus.eeg\_transforms module
+-----------------------------
+
+.. automodule:: eremus.eeg_transforms
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 eremus.eremus\_utils module
 ---------------------------
 
 .. automodule:: eremus.eremus_utils
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+eremus.features\_transforms module
+----------------------------------
+
+.. automodule:: eremus.features_transforms
    :members:
    :undoc-members:
    :show-inheritance:

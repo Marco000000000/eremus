@@ -101,6 +101,7 @@ def nn(nn_max_index=7):
     ---------------
     dict
         Supposing you are saving the return value in nn_dict:
+        
             - nn_dict['ch_name'][i] returns the name of the i_th target channel
             - nn_dict['ch_pos'][i] returns the position of the i_th target channel
             - nn_dict['nn_names'][i] returns the names of the N = nn_max_index nearest neighbors for target channel
@@ -188,6 +189,15 @@ def spatial_filter(raw, N=7, weighted=True, return_only_data=False):
     ------------------
     Union[mne.io.RawXXX, numpy.ndarray]
         The filtered data. If *return_only_data* is False and *raw* is Raw, it returns a new Raw object with filtered data, otherwise an array containing filtered data (not wrapped in Raw object).
+        
+    References
+    ------------
+    Michel Christoph M., Brunet Denis
+    EEG Source Imaging: A Practical Review of the Analysis Steps  
+    in "Frontiers in Neurology"   
+    n.10, 2019
+    https://www.frontiersin.org/article/10.3389/fneur.2019.00325     
+    doi: 10.3389/fneur.2019.00325      
     """
     # check N
     assert N<=32, "N must be in range(num_channels), number of chans is 32 in EREMUS"
