@@ -13,6 +13,7 @@ setup(
     version='0.1',
     license='MIT',
     description='Utilities for EREMUS dataset',
+    include_package_data=True,
     # We will also need a readme eventually (there will be a warning)
     # long_description=open('README.txt').read(),
 )
