@@ -1,4 +1,9 @@
 import pkgutil
+try:
+    import comet_ml
+    has_cml = True
+except:
+    has_cml = False
 
 __all__ = []
 for loader, module_name, is_pkg in  pkgutil.walk_packages(__path__):

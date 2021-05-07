@@ -166,7 +166,7 @@ class Saver(object):
                 subprocess.run(['git', cmd], stdout=f)
         # Dump model's code on cometml
         if self.cml is not None:
-            with open(os.path.dirname(__file__) + '\\models\\' + self.args.__dict__["model"] + ".py") as file:
+            with open(os.path.dirname(__file__) + '\\..\\models\\' + self.args.__dict__["model"] + ".py") as file:
                 code_str = file.read()
                 self.cml.set_code(code_str,overwrite=True, filename=self.args.__dict__["model"]+".py")
 
