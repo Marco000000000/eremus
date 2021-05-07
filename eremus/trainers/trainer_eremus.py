@@ -1,11 +1,14 @@
+from eremus.utils.saver import Saver
+
+import eremus.models as models
+from eremus.utils.models import add_net_to_params
+
+
 from tqdm import tqdm
 import torch
 import pandas as pd
 import torch.nn as nn
-import eremus.models as models
 import torch.nn.functional as F
-from eremus.utils.saver import Saver
-from eremus.utils.models import add_net_to_params
 from torch.utils.data import DataLoader, WeightedRandomSampler
 
 # Histogram logging utilities
