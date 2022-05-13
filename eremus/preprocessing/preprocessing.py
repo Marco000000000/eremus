@@ -22,10 +22,10 @@ from torch.utils.data import DataLoader, Subset, ConcatDataset, random_split
 configuration_path = Path(__file__).parent.parent
 with open(configuration_path / 'configuration.txt') as json_file:
     configuration = json.load(json_file)
-    path_to_eremus_data = configuration['path_to_eremus_data']
-dataset_file = pd.read_excel(path_to_eremus_data + 'eremus_test.xlsx')
-pruned_eeg_root_dir = path_to_eremus_data + 'recordings_pruned_with_ICA\\'
-preprocessed_eeg_root_dir = path_to_eremus_data + 'preprocessed_data\\'
+    path_to_eremus_data = Path(configuration['path_to_eremus_data'])
+dataset_file = pd.read_excel(path_to_eremus_data/'eremus_test.xlsx')
+pruned_eeg_root_dir = path_to_eremus_data/Path('recordings_pruned_with_ICA')
+preprocessed_eeg_root_dir = path_to_eremus_data/Path('preprocessed_data')
 
 def z_score_norm(raw_eeg_t, mean=None, std=None):
     """

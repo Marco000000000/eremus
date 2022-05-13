@@ -14,13 +14,13 @@ from torchvision import transforms, utils
 
 # get a sample from dataset
 configuration_path = Path(__file__).parent.parent
-with open(configuration_path / 'configuration.txt') as json_file:
+with open(configuration_path /'configuration.txt') as json_file:
     configuration = json.load(json_file)
-    path_to_eremus_data = configuration['path_to_eremus_data']
-samples = pd.read_excel(path_to_eremus_data + 'eremus_test.xlsx')
-pruned_eeg_root_dir = path_to_eremus_data + 'recordings_pruned_with_ICA\\'
+    path_to_eremus_data = Path(configuration['path_to_eremus_data'])
+samples = pd.read_excel(path_to_eremus_data/'eremus_test.xlsx')
+pruned_eeg_root_dir = path_to_eremus_data/Path('recordings_pruned_with_ICA')
 eeg_file = samples.iloc[0]['filename_pruned']
-sample = mne.io.read_raw_eeglab(pruned_eeg_root_dir + eeg_file, verbose = False)
+sample = mne.io.read_raw_eeglab(pruned_eeg_root_dir/eeg_file, verbose = False)
 
 # get and plot montage
 ten_twenty_montage = mne.channels.make_standard_montage('standard_1020')
