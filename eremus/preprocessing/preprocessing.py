@@ -662,7 +662,7 @@ def get_dataset_stats_by_baseline(baselines, pruned_eeg_root_dir=pruned_eeg_root
 # STATS USED WITH EXTRACTED FEATURES (SUBJECT LEVEL)
 #======================================================
 
-def get_fe_stats(sample, root_dir=preprocessed_eeg_root_dir + 'de\\', axis=None, verbose=False):
+def get_fe_stats(sample, root_dir=preprocessed_eeg_root_dir/Path('de'), axis=None, verbose=False):
     """
     Given a sample entry of EREMUS dataset, returns the statistics of the given sample.
 
@@ -713,7 +713,7 @@ def get_fe_stats(sample, root_dir=preprocessed_eeg_root_dir + 'de\\', axis=None,
         print('maxim: ' + str(maxim))
     return mean, std, minim, maxim, F
 
-def get_fe_subject_stats(eeg_data, sub_id, root_dir=preprocessed_eeg_root_dir + 'de\\', select_single_session=True, select_other_session=False, axis=None, verbose=False):
+def get_fe_subject_stats(eeg_data, sub_id, root_dir=preprocessed_eeg_root_dir/Path('de'), select_single_session=True, select_other_session=False, axis=None, verbose=False):
     """
     Given a dataframe containing all entries, subject_id, session type, returns the statistics of the given subject for the specified session.
     
