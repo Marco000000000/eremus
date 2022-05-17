@@ -27,6 +27,47 @@ dataset_file = pd.read_excel(path_to_eremus_data/'eremus_test.xlsx')
 pruned_eeg_root_dir = path_to_eremus_data/Path('recordings_pruned_with_ICA')
 preprocessed_eeg_root_dir = path_to_eremus_data/Path('preprocessed_data')
 
+class ResidualNan(Exception):
+    """Describers the presence of NaNs in data"""
+    pass
+
+def interpolate(raw_data):
+    """
+    Replace nans values with linear interpolation under the hypotesis that errors are always punctual.
+    
+    Parameters
+    -------------
+    raw_data : numpy.ndarray
+        The raw data. 
+    
+    Returns
+    ------------
+    numpy.ndarray
+        the pruned data into the input's format, without nans
+    """
+    # get indices of nans
+    nan_indices = np.where(np.isnan(raw_data))
+    nan_indices = np.vstack(nan_indices).transpose()
+
+    # hypotesis, Punctual nans
+    for channel, timepoint in nan_indices:
+
+        # get value before the point
+        before = raw_data[channel, timepoint-1]
+        # get value after the point
+        after = raw_data[channel, timepoint-1]
+
+        # interpolate
+        raw_data[channel, timepoint] = (before + after) / 2
+
+    nan_indices = np.where(np.isnan(raw_data))
+    nan_indices = np.vstack(nan_indices).transpose()
+    any_nan = nan_indices.shape[0]!=0
+    if any_nan:
+        raise ResidualNan("Data still contain Nans after interpolation")
+        
+    return raw_data
+
 def z_score_norm(raw_eeg_t, mean=None, std=None):
     """
     Change data distribution to meet standardization constraints (0-mean, 1-std).
@@ -331,6 +372,7 @@ def get_song_stats(song, pruned_eeg_root_dir=pruned_eeg_root_dir, return_ch_stat
 
     # get data 
     raw_eeg = raw_eeg.get_data()
+    raw_eeg = interpolate(raw_eeg)
     if return_tensor:
         # convert to Tensor 
         raw_eeg = torch.Tensor(raw_eeg)
@@ -370,7 +412,7 @@ def get_subject_stats(eeg_data, sub_id, pruned_eeg_root_dir=pruned_eeg_root_dir,
     pruned_eeg_root_dir : str
         The eremus raw data directory. 
     select_single_session : bool
-        If True it evaluates OTHER or PERSONAL session, depending on *select_other_sessioné* parameter, otherwise it evaluates both OTHER and PERSONAL sessions.
+        If True it evaluates OTHER or PERSONAL session, depending on *select_other_session* parameter, otherwise it evaluates both OTHER and PERSONAL sessions.
     select_other_session : bool
         If True it evaluates OTHER session, if False it evaluates PERSONAL session.
     return_ch_stats : bool 
@@ -568,6 +610,7 @@ def get_subject_stats_by_baseline(baselines, subject_id, required_session_type, 
 
     # get data 
     raw_eeg = raw_eeg.get_data()
+    raw_eeg = interpolate(raw_eeg)
     if return_tensor:
         # convert to Tensor 
         raw_eeg = torch.Tensor(raw_eeg)

@@ -11,17 +11,29 @@ from torch.utils.data import dataset
 
 class Model(nn.Module):
 
-    def __init__(self, ntoken: int = 2, d_model: int = 640, nhead: int = 2, d_hid: int = 2048,
-                 nlayers: int = 1, dropout: float = 0.5, verbose = False):
-        super().__init__()
+    def __init__(self, args):
+        
+        
+        super(Model, self).__init__()
+        args_defaults=dict(
+            num_classes = 4,
+            num_channels = 32, 
+            d_model = 32,
+            nhead = 2, 
+            d_hid = 2048,
+            nlayers = 1,
+            dropout = 0.5, 
+            verbose = False
+        )
+        for arg, default in args_defaults.items():
+            setattr(self, arg, args[arg] if arg in args and args[arg] is not None else default)
+
         self.model_type = 'Transformer'
-        self.pos_encoder = PositionalEncoding(d_model, dropout)
-        encoder_layers = TransformerEncoderLayer(d_model, nhead, d_hid, dropout)
-        self.transformer_encoder = TransformerEncoder(encoder_layers, nlayers)
+        self.pos_encoder = PositionalEncoding(self.d_model, self.dropout)
+        encoder_layers = TransformerEncoderLayer(self.d_model, self.nhead, self.d_hid, self.dropout)
+        self.transformer_encoder = TransformerEncoder(encoder_layers, self.nlayers)
         #self.encoder = nn.Embedding(ntoken, d_model)
-        self.d_model = d_model
-        self.decoder = nn.Linear(d_model, ntoken)
-        self.verbose = verbose
+        self.decoder = nn.Linear(self.d_model, self.num_classes)
 
         self.init_weights()
 
@@ -38,7 +50,7 @@ class Model(nn.Module):
             src_mask: Tensor, shape [seq_len, seq_len]
 
         Returns:
-            output Tensor of shape [seq_len, batch_size, ntoken]
+            output Tensor of shape [seq_len, batch_size, num_classes]
         """
         #src = self.encoder(src) * math.sqrt(self.d_model)
         if self.verbose:

@@ -2,7 +2,7 @@ from eremus.utils.saver import Saver
 
 import eremus.models as models
 from eremus.utils.models import add_net_to_params
-
+from eremus.models.eeg_transformer import generate_square_subsequent_mask
 
 from tqdm import tqdm
 import torch
@@ -331,7 +331,12 @@ class Trainer:
                         if args.log_histograms and split == 'train' and step % plot_every == 0:
                             setup_forward_hooks(net)
                         # Model-specific forward
-                        if args.model == 'graph_attention':
+                        if args.model == 'eeg_transformer':
+                            # move batch size
+                            inputs = inputs.permute(2, 0, 1)
+                            seq_len = inputs.size(0)
+                            outputs = net(inputs, generate_square_subsequent_mask(seq_len).to(args.device))
+                        elif args.model == 'graph_attention':
                             # Forward step with graph attention model pre-training (without updating GP Adapter parameters)
                             outputs = net(inputs, pre_train=(args.pre_train and epoch < args.pre_train_epochs))
                         else:
