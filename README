@@ -20,7 +20,7 @@ pip install sphinx-rtd-theme
 make html
 ```
 This will create a `build\html` directory. 
-Go to `index.html` and start navigating!
+Go to `index.html` and start navigating with your favourite browser!
 
 Enjoy!
 
